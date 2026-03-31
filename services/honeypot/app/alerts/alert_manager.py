@@ -75,6 +75,7 @@ async def check_and_trigger_alerts(
         await send_webhook_alert(alert_payload)
     if severity == "critical":
         await send_email_alert(alert_payload)
-        # Dynamic Firewall integration
-        await block_ip(source_ip)
-        logger.warning(f"IP {source_ip} firewalled due to critical alert.")
+        # Honeypot philosophy: NEVER block attackers. We WANT them to keep
+        # talking so we can collect maximum intelligence and behavioural data.
+        # await block_ip(source_ip)  # Disabled — honeypots trap, not block
+        logger.warning(f"IP {source_ip} triggered critical alert — continuing to trap for intelligence.")
