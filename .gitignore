@@ -1,0 +1,34 @@
+# AI-Adaptive Honeypot — Git Ignore
+
+# Environment & secrets
+.env
+*.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Logs (runtime data)
+logs/*.log
+
+# Docker artifacts
+.docker/
+
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+# VS Code workspace settings are kept (settings.json) but user-specific are excluded
+.vscode/*.code-snippets
+.vscode/launch.json
+
+# Postgres data
+postgres-data/

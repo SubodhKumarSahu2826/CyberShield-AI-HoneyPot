@@ -1,0 +1,221 @@
+# =============================================================================
+# AI-Adaptive Honeypot Platform — Docker Compose Orchestration
+# Day 1: Foundation Infrastructure
+# =============================================================================
+
+networks:
+  honeypot-net:
+    driver: bridge
+    # Internal network — services communicate here; postgres is not exposed
+    internal: false   # must be false so honeypot can accept internet traffic
+                       # postgres has no port mapping so it's effectively private
+
+volumes:
+  postgres-data:
+    driver: local
+  logs-data:
+    driver: local
+
+
+services:
+
+  # ===========================================================================
+  # PostgreSQL — Internal only, never exposed to the internet
+  # ===========================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: honeypot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB:-honeypot}
+      POSTGRES_USER:     ${POSTGRES_USER:-honeypot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./services/database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - honeypot-net
+    # NO ports mapping — database not accessible from host or internet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-honeypot} -d ${POSTGRES_DB:-honeypot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  # ===========================================================================
+  # Honeypot HTTP Capture Service — Public-facing on port 8080
+  # ===========================================================================
+  honeypot:
+    build:
+      context: ./services/honeypot
+      dockerfile: Dockerfile
+    container_name: honeypot-capture
+    restart: unless-stopped
+    ports:
+      - "8080:8080"               # Attacker-facing port
+    environment:
+      POSTGRES_HOST:     postgres
+      POSTGRES_PORT:     5432
+      POSTGRES_DB:       ${POSTGRES_DB:-honeypot}
+      POSTGRES_USER:     ${POSTGRES_USER:-honeypot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+      LOG_LEVEL:         ${LOG_LEVEL:-INFO}
+    volumes:
+      - logs-data:/logs
+    networks:
+      - honeypot-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/_health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  # ===========================================================================
+  # API Query Service — Internal only (no public port mapping)
+  # ===========================================================================
+  api:
+    build:
+      context: ./services/api
+      dockerfile: Dockerfile
+    container_name: honeypot-api
+    restart: unless-stopped
+    # No public port mapping — accessed only via dashboard proxy or internal net
+    expose:
+      - "3001"
+    environment:
+      POSTGRES_HOST:     postgres
+      POSTGRES_PORT:     5432
+      POSTGRES_DB:       ${POSTGRES_DB:-honeypot}
+      POSTGRES_USER:     ${POSTGRES_USER:-honeypot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+      LOG_LEVEL:         ${LOG_LEVEL:-INFO}
+    networks:
+      - honeypot-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/_health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+
+  # ===========================================================================
+  # Response Generator Service — Internal LLM Deception (Day 6 Milestone 2A)
+  # ===========================================================================
+  response-generator:
+    build:
+      context: ./services/response-generator
+      dockerfile: Dockerfile
+    container_name: honeypot-response-generator
+    restart: unless-stopped
+    expose:
+      - "3002"
+    environment:
+      # Use host.docker.internal to route back to local macbook context or use a remote ngrok endpoint
+      LLM_URL: "${LLM_URL:-http://host.docker.internal:11434/api/generate}"
+      MODEL_NAME: "${MODEL_NAME:-qwen2.5:3b}"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      POSTGRES_HOST:     postgres
+      POSTGRES_PORT:     5432
+      POSTGRES_DB:       ${POSTGRES_DB:-honeypot}
+      POSTGRES_USER:     ${POSTGRES_USER:-honeypot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
+    networks:
+      - honeypot-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3002/_health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+  # ===========================================================================
+  # Monitoring Dashboard — Public-facing on port 3000
+  # ===========================================================================
+  dashboard:
+    build:
+      context: ./services/dashboard
+      dockerfile: Dockerfile
+    container_name: honeypot-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      API_HOST:        api
+      API_PORT:        3001
+      DASHBOARD_PORT:  3000
+    networks:
+      - honeypot-net
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/_health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+
+  # ===========================================================================
+  # Classifier Service — Internal LLM Classification (Day 4)
+  # ===========================================================================
+  classifier:
+    build:
+      context: ./services/classifier
+      dockerfile: Dockerfile
+    container_name: honeypot-classifier
+    restart: unless-stopped
+    expose:
+      - "5001"
+    environment:
+      PHI_MODEL_URL: "http://host.docker.internal:11434"
+      PHI_MODEL_NAME: "${MODEL_NAME:-qwen2.5:3b}"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    networks:
+      - honeypot-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5001/_health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M

@@ -1,0 +1,13 @@
+{
+  // Automatically load .env variables into integrated terminals
+  "python.terminal.useEnvFile": true,
+  "python.envFile": "${workspaceFolder}/.env",
+
+  // Recommended settings for this project
+  "python.defaultInterpreterPath": "python3",
+  "editor.formatOnSave": true,
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true
+  }
+}
