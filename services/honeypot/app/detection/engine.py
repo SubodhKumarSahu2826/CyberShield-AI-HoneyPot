@@ -97,7 +97,31 @@ def analyze(
                 break
 
     if best_match is None:
-        # No pattern matched — still flag as suspicious (unknown scanner/bot)
+        # No pattern matched — determine if this looks benign or suspicious
+        # Heuristic: short payloads on common API paths with no encoded chars are likely safe
+        combined_len = len(endpoint) + len(payload)
+        has_encoding = any(c in scan_surface for c in ['%00', '%0a', '%0d', '\\x', '\\u'])
+        lower_surface = scan_surface.lower()
+        looks_benign = (
+            combined_len < 500
+            and not has_encoding
+            and not any(kw in lower_surface for kw in [
+                'passwd', 'shadow', 'admin', 'root', 'shell', 'exec',
+                'system(', 'eval(', 'base64', 'cmd', '<!--', 'entity',
+                'doctype', '<!', 'file://', 'meta-data', '$gt', '$ne',
+                '$regex', 'security-credentials', '/internal',
+            ])
+        )
+
+        if looks_benign:
+            return DetectionResult(
+                status="safe",
+                attack_type="none",
+                detection_score=0.0,
+                matched_rule="",
+                all_matches=[],
+            )
+
         return DetectionResult(
             status="suspicious",
             attack_type="unknown",

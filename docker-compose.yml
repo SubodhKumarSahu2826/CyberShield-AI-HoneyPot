@@ -136,17 +136,10 @@ services:
       # Use host.docker.internal to route back to local macbook context or use a remote ngrok endpoint
       LLM_URL: "${LLM_URL:-http://host.docker.internal:11434/api/generate}"
       MODEL_NAME: "${MODEL_NAME:-qwen2.5:3b}"
+      LLM_TIMEOUT: "${LLM_TIMEOUT:-30}"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
-      POSTGRES_HOST:     postgres
-      POSTGRES_PORT:     5432
-      POSTGRES_DB:       ${POSTGRES_DB:-honeypot}
-      POSTGRES_USER:     ${POSTGRES_USER:-honeypot}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_in_production}
     networks:
       - honeypot-net
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:3002/_health || exit 1"]
       interval: 15s

@@ -1,21 +1,24 @@
-# AI-Adaptive Honeypot Platform — Project Context
+# CyberShield AI Honeypot Platform — Project Context
 
-> **Last updated:** Milestone 3 (Monitoring, Visualization & Production Hardening)
-> **Development Timeline:** Milestone 3
-> **Status:** ✅ Rate-limiting, dynamic firewalling, alert manager, dataset exporting, and real-time Chart.js visual analytics integrated.
+> **Last updated:** Milestone 5 (AI Classification Pipeline, Three-Tier Detection & Dashboard Polish)
+> **Development Timeline:** Milestone 5
+> **Status:** ✅ Full hybrid detection pipeline (Rule-Based + AI), three-tier classification (safe/suspicious/malicious), async AI inference, LLM deception, behaviour profiling, export functionality, and production-ready dashboard.
 
 ---
 
 ## Project Overview
 
-The **AI-Adaptive Honeypot Platform** (codename: **SentinAI**) is a production-grade, AI-powered cybersecurity research platform designed to:
+The **CyberShield AI Honeypot Platform** is a production-grade, AI-powered cybersecurity research platform designed to:
 
-- **Capture** real-world attacker HTTP traffic from the public internet
-- **Store** structured threat intelligence in a PostgreSQL database
-- **Analyze** attack patterns using AI/ML (planned, Day 3+)
-- **Deceive** attackers with context-aware, AI-generated responses (planned, Day 5+)
+- **Capture** real-world attacker HTTP traffic
+- **Store** structured threat intelligence in a PostgreSQL database with persistent Docker volumes
+- **Analyze** attack patterns using a hybrid Rule-Based + AI classification pipeline
+- **Classify** traffic into three tiers: `safe`, `suspicious`, and `malicious`
+- **Deceive** attackers with context-aware, LLM-generated fake responses
+- **Profile** attacker behaviour with sophistication scoring (0-10)
+- **Export** all captured data as CSV/JSON for SIEM integration
 
-The platform is deployed on Ubuntu 22.04 with 2 vCPU / 4 GB RAM and runs entirely inside Docker containers.
+The platform runs entirely inside Docker containers on macOS (development) or Linux (production).
 
 ---
 
@@ -29,30 +32,44 @@ Internet Traffic
 ┌──────────────────────────────┐
 │  honeypot-container          │  Port 8080 (public)
 │  FastAPI — Catch-All Capture │
-│     ↓ detect.engine.analyze()│  ◄── NEW (Day 2)
-│  Rule-Based Detection Engine │       73 regex rules
-│  Deceptive fake responses    │       7 attack categories
+│     ↓ detect.engine.analyze()│  73 regex rules, 7 attack categories
+│  Rule-Based Detection Engine │  Three-tier: safe / suspicious / malicious
+│     ↓ (suspicious only)      │
+│  Async AI Queue → Classifier │  Qwen 2.5 / Phi-3.5 via Ollama
+│     ↓                        │
+│  LLM Deception Response Gen  │  Context-aware fake responses
 └──────────────┬───────────────┘
-               │ INSERT (+ detection_status, attack_type, detection_score)
+               │ INSERT (detection_status, attack_type, ai_attack_type, ai_confidence_score)
                ▼
 ┌──────────────────────────────┐
-│  postgres-container          │  Internal only
+│  postgres-container          │  Internal only (persistent volume)
 │  PostgreSQL 15               │
-│  requests table + indexes    │
+│  requests, sessions, alerts  │
 └──────────────┬───────────────┘
                │ SELECT
                ▼
 ┌──────────────────────────────┐
 │  api-container               │  Internal only (port 3001)
-│  FastAPI — Query REST API    │
-│  /requests /stats /detections│
+│  FastAPI — Query REST API    │  12+ endpoints + CSV/JSON export
 └──────────────┬───────────────┘
                │ HTTP Proxy
                ▼
 ┌──────────────────────────────┐
 │  dashboard-container         │  Port 3000 (public)
-│  aiohttp — Live Monitor UI   │
-│  Dark-themed HTML dashboard  │
+│  aiohttp — CyberShield UI    │
+│  Dark glassmorphism dashboard│
+└──────────────────────────────┘
+
+┌──────────────────────────────┐
+│  classifier-container        │  Internal only (port 3003)
+│  FastAPI — AI Classification │
+│  Prompts Qwen 2.5 via Ollama │
+└──────────────────────────────┘
+
+┌──────────────────────────────┐
+│  response-gen-container      │  Internal only (port 3002)
+│  FastAPI — LLM Deception     │
+│  Generates fake responses    │
 └──────────────────────────────┘
 ```
 
@@ -117,14 +134,20 @@ A modular, zero-dependency detection engine embedded directly in the honeypot pr
 **`engine.py`** — `analyze(endpoint, payload, headers) -> DetectionResult`
 - Scans combined surface: endpoint + payload + headers
 - Returns best-match rule; early-exit at score ≥ 0.98 for performance
-- Default result for no match: `{status: suspicious, score: 0.2}`
+- **Three-tier classification:**
+  - `safe` → No rules matched AND payload looks benign (short, no encoding, no suspicious keywords)
+  - `suspicious` → No rules matched BUT payload contains suspicious indicators → queued for AI
+  - `malicious` → Rule matched with confidence ≥ 0.50
 
 **Output format:**
 ```json
-// Malicious match:
+// Safe (benign traffic):
+{"status": "safe", "attack_type": "none", "detection_score": 0.0}
+
+// Malicious match (regex):
 {"status": "malicious", "attack_type": "SQL Injection", "detection_score": 0.98}
 
-// No match:
+// Suspicious (queued for AI):
 {"status": "suspicious", "attack_type": "unknown", "detection_score": 0.2}
 ```
 
@@ -301,10 +324,12 @@ Store original request + generated `response` & `response_type` in Postgres
 ### ✅ Milestone 3 — Monitoring, Visualization & Production Hardening
 
 #### Security Hardening (`services/honeypot/app/security/`)
-- **`rate_limiter.py`**: A sliding-window token bucket implementation tracking connections. Defends against immediate volumetric layer attacks by returning 429 errors.
-- **`firewall_rules.py`**: Immediate TCP-level (application layer) dynamic firewall. Permanently blocks IPs exceeding critical severity thresholds.
-- **`input_sanitizer.py`**: Null-byte and unprintable character stripping explicitly protecting the system from exotic log injection variants.
+- **`rate_limiter.py`**: A sliding-window token bucket implementation tracking connections. Defends against volumetric attacks by returning 429 errors.
+- **`firewall_rules.py`**: Dynamic firewall infrastructure (disabled by design — honeypots trap, don't block).
+- **`input_sanitizer.py`**: Null-byte and unprintable character stripping protecting the system from log injection variants.
 - Enforced hard `0.5` CPU limits across Docker orchestration.
+
+> **Design Decision:** The `block_ip()` function exists but is intentionally disabled in the alert handler. A honeypot's purpose is to *attract and study* attackers, not block them. Blocking would stop intelligence collection. The alert still fires and gets logged.
 
 #### Real-time Alerting (`services/honeypot/app/alerts/`)
 - **`alert_manager.py`**: Background asynchronous task parsing incoming behavioral triggers against severity thresholds (e.g. Volume > 100, AI Score >= 9.0).
@@ -343,17 +368,18 @@ Store original request + generated `response` & `response_type` in Postgres
 | 1 | Foundation Infrastructure | ✅ Done | Docker, honeypot capture, DB, API, dashboard |
 | 2 | Rule-Based Detection Engine | ✅ Done | 73-rule regex engine, 7 attack categories |
 | 3 | Session Tracking & Logging | ✅ Done | Session manager, structured JSON logs, dataset pipeline |
-| 4 | AI Attack Classifier | ✅ Done | Fast API microservice, LLM segregation, Dashboard UI |
+| 4 | AI Attack Classifier | ✅ Done | FastAPI microservice, LLM segregation, Dashboard UI |
 | 5 | Async Inference | ✅ Done | Deferred AI payload queueing via classification workers |
 | 6 | Active Deception | ✅ Done | LLM generated fake responses, contextual prompts |
 | 7 | Attacker Profiling | ✅ Done | Deep behavior analysis, session correlation, sophistication scoring |
 | 8 | Analytics Engine | ✅ Done | Time-series analysis, attack trend detection |
 | 9 | Alerting System | ✅ Done | Real-time alerts via webhook/email |
-| 10 | Threat Intelligence | ⏳ Pending | IP geolocation, reputation lookup |
-| 11 | API Enhancements | ✅ Done | Filtering, search, dataset export endpoints |
-| 12 | Hardening | ✅ Done | Rate limiting, TLS, production security |
+| 10 | Threat Intelligence | ✅ Done | IP geolocation, reputation lookup enrichment |
+| 11 | API Enhancements | ✅ Done | Filtering, search, dataset export (CSV/JSON) |
+| 12 | Hardening | ✅ Done | Rate limiting, input sanitization, production security |
 | 13 | Testing & QA | ✅ Done | Attack simulation suite, LLM response validation, edge case handling |
-| 14 | Documentation | ⏳ Pending | Full deployment guide, runbook |
+| 14 | Three-Tier Detection | ✅ Done | Safe/suspicious/malicious classification, benign heuristic |
+| 15 | Dashboard Polish | ✅ Done | CyberShield rebrand, export buttons, variable request view (20/100/500) |
 
 ---
 
@@ -411,8 +437,10 @@ docker-compose ps
 | api | honeypot-api | 3001 (internal) | 128 MB |
 | dashboard | honeypot-dashboard | 3000 (public) | 128 MB |
 | postgres | honeypot-postgres | none (internal) | 256 MB |
+| classifier | honeypot-classifier | 3003 (internal) | 256 MB |
+| response-generator | honeypot-response-generator | 3002 (internal) | 256 MB |
 
-**Total memory budget:** ~768 MB (well within 4 GB constraint)
+**Total services:** 6 containers
 
 ---
 
@@ -489,16 +517,18 @@ VIEWS:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/requests` | Paginated request list (incl. session_id, response_generated) |
-| GET | `/requests/latest` | Last 20 captured requests (incl. detection + session fields) |
-| GET | `/detections` | Confirmed malicious requests only `[Day 2]` |
-| GET | `/sessions` | Attacker sessions with stats (request count, top attack, duration) `[Day 3]` |
-| GET | `/attacker-profiles` | Aggregated attacker profile behaviors and sophistication scores `[Milestone 2B]` |
-| GET | `/analytics` | Timeline buckets grouped by the hour representing total volume vectors `[Milestone 3]` |
-| GET | `/alerts` | Chronological fetch capturing threshold anomalies emitted by the engine `[Milestone 3]` |
-| GET | `/export/json` | Fetches JSON collection dump `[Milestone 3]` |
-| GET | `/export/csv` | Fetches parsed CSV string `[Milestone 3]` |
-| GET | `/stats` | Total, unique IPs, malicious count, attack breakdown `[Day 2]` |
+| GET | `/requests` | Paginated request list with IP/method/date filters |
+| GET | `/requests/latest` | Last 20 captured requests (incl. detection + AI + session fields) |
+| GET | `/detections` | Confirmed malicious requests only |
+| GET | `/sessions` | Attacker sessions with stats (request count, top attack, duration) |
+| GET | `/sessions/{id}/timeline` | Chronological events for a specific attacker session |
+| GET | `/attacker-profiles` | Aggregated attacker behaviour profiles with sophistication scores |
+| GET | `/analytics` | Timeline buckets grouped by the hour for traffic charts |
+| GET | `/alerts` | Chronological security alerts feed |
+| GET | `/export/json` | Full dataset export as JSON |
+| GET | `/export/csv` | Full dataset export as CSV |
+| GET | `/stats` | Total, unique IPs, malicious count, attack breakdown, attacker types |
+| GET | `/metrics` | Prometheus-compatible metrics format |
 | GET | `/_health` | Docker health check |
 
 ---
@@ -517,12 +547,57 @@ VIEWS:
 
 ---
 
-## Next Development Steps (Day 10)
+## Startup Guide (Cold Boot)
 
-1. Perform threat intelligence ingestion (IP Geolocation mapping over endpoints bounding threat vectors securely).
-2. Deepen visual components map interactions into geographical locations.
-3. Configure robust load balancing mechanisms scaling Docker pipelines horizontally.
+```bash
+# 1. Open Docker Desktop and Ollama app
+# 2. Navigate to the project
+cd "/Users/sks/Desktop/AI-Adaptive Cyber HoneyPot"
+
+# 3. Start all services
+docker-compose up -d
+
+# 4. Verify all 6 containers are running
+docker-compose ps
+
+# 5. (Optional) Pre-warm the AI model
+curl http://localhost:11434/api/generate -d '{"model": "qwen2.5:3b", "prompt": "Wake up", "stream": false}'
+
+# 6. Access dashboard
+open http://localhost:3000
+
+# 7. Test with a sample attack
+curl "http://localhost:8080/api/users/login?user=admin'%20OR%201=1--"
+
+# 8. Shut down cleanly
+docker-compose down
+```
+
 ---
 
-*This file is maintained as the single source of truth for project context.*
+## Testing Commands
+
+### Safe Requests (Green SAFE badge)
+```bash
+curl "http://localhost:8080/api/products"
+curl "http://localhost:8080/api/search?q=laptop&category=electronics"
+curl -X POST "http://localhost:8080/api/contact" -H "Content-Type: application/json" -d '{"name": "John", "message": "Hello"}'
+```
+
+### Rule-Based Detection (Red MALICIOUS badge — instant)
+```bash
+curl "http://localhost:8080/api/users/login?user=admin'%20OR%201=1--"
+curl -X POST "http://localhost:8080/api/feedback" -d 'comment=<script>document.cookie</script>'
+curl "http://localhost:8080/api/serve?file=../../../../../../etc/passwd"
+```
+
+### AI-Based Detection (Yellow SUSPICIOUS → Red MALICIOUS after ~10s)
+```bash
+curl -X POST "http://localhost:8080/api/v2/auth/login" -H "Content-Type: application/json" -d '{"username": {"$gt": ""}, "password": {"$ne": null}}'
+curl -X POST "http://localhost:8080/api/import-data" -H "Content-Type: application/xml" -d '<?xml version="1.0"?><!DOCTYPE r [<!ENTITY e SYSTEM "file:///var/log/syslog">]><R><d>&e;</d></R>'
+```
+
+---
+
+*This file is maintained as the single source of truth for CyberShield project context.*
 *Update it whenever new components are implemented or the architecture changes.*
