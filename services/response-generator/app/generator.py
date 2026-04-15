@@ -39,17 +39,41 @@ _AI_PATTERNS = re.compile(
 def _classify_response_type(attack_type: str) -> str:
     """Map attack_type to a clean response_type value."""
     upper = attack_type.upper()
-    if "SQL" in upper:
+    if "SQL" in upper and "NOSQL" not in upper:
         return "sql"
+    if "NOSQL" in upper or "MONGO" in upper:
+        return "json"
     if any(kw in upper for kw in ("FILE", "TRAVERSAL", "DIRECTORY", "PATH")):
         return "file"
-    if "AUTH" in upper or "BRUTE" in upper:
+    if "AUTH" in upper or "BRUTE" in upper or "CREDENTIAL" in upper:
         return "auth"
     if "COMMAND" in upper:
         return "file"  # terminal output is file-like
     if "XSS" in upper or "CROSS" in upper:
-        return "generic"
+        return "html"
+    if "SSRF" in upper or "SERVER-SIDE" in upper:
+        return "json"
+    if "XML" in upper or "XXE" in upper or "ENTITY" in upper:
+        return "xml"
+    if "JNDI" in upper or "LOG4" in upper or "DESERIALIZATION" in upper:
+        return "json"
+    if "ACCESS" in upper or "BROKEN" in upper or "IDOR" in upper:
+        return "json"
+    if "ENUM" in upper:
+        return "file"
     return "generic"
+
+
+def _sanitize_response(text: str) -> str:
+    """
+    Remove markdown code block formatting (like ```bash / ```html).
+    A real server does not return markdown formatting.
+    """
+    # Remove starting markdown blocks
+    text = re.sub(r"```[a-zA-Z]*\n", "", text)
+    # Remove ending markdown blocks
+    text = re.sub(r"\n?```\n?", "\n", text)
+    return text.strip()
 
 
 def _validate_response(text: str) -> bool:
@@ -94,10 +118,13 @@ async def generate_llm_response(
 
     try:
         # Build prompt using strict templates
-        prompt = build_prompt(payload, attack_type)
+        prompt = build_prompt(payload, attack_type, endpoint)
 
         # Call LLM via isolated client
         llm_text = await call_llm(prompt)
+
+        # Sanitize LLM text (strip markdown blocks)
+        llm_text = _sanitize_response(llm_text)
 
         # Validate the response
         if _validate_response(llm_text):

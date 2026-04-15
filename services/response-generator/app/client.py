@@ -54,9 +54,10 @@ async def call_llm(prompt: str) -> str:
                     "prompt": prompt,
                     "stream": False,
                     "options": {
-                        "temperature": 0.5,
-                        "num_predict": 800,
+                        "temperature": 0.4,
+                        "num_predict": 1024,
                     },
+                    "keep_alive": "10m",
                 },
             )
             resp.raise_for_status()

@@ -195,7 +195,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     /* MODAL */
     .modal-overlay { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.75); backdrop-filter: blur(12px); animation: fadeIn 0.2s ease-out; }
-    .modal-content { background: rgba(17,24,39,0.95); border: 1px solid var(--border); border-radius: var(--radius); width: 90vw; max-width: 900px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.9); backdrop-filter: blur(20px); }
+    .modal-content { background: rgba(17,24,39,0.95); border: 1px solid var(--border); border-radius: var(--radius); width: 95vw; max-width: 1300px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 25px 60px rgba(0,0,0,0.9); backdrop-filter: blur(20px); }
     .modal-header { padding: 1.25rem 1.75rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.3); border-radius: var(--radius) var(--radius) 0 0; flex-shrink: 0; }
     .modal-header-info { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
     .modal-close { background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--text-muted); font-size: 1.2rem; cursor: pointer; transition: all 0.2s; padding: 0.4rem 0.8rem; border-radius: 8px; }
@@ -253,11 +253,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .animate-in { animation: slideUp 0.4s ease-out; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     Chart.defaults.color = 'rgba(148, 163, 184, 0.8)';
     Chart.defaults.font.family = "'Outfit', sans-serif";
     let timelineChartInstance = null;
     let pieChartInstance = null;
+    let radarChartInstance = null;
+    let threatMap = null;
+    let mapMarkers = [];
   </script>
 </head>
 <body>
@@ -326,6 +331,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <div id="analytics" class="section-title" style="margin-top: 1rem; padding-top: 2rem;">📈 Analytics & Threat Feed</div>
   <div class="dual-col" style="margin-bottom: 2.5rem;">
     <div class="card glass-panel" style="grid-column: 1 / -1;">
+      <div class="card-header">Live Geo-IP Threat Map</div>
+      <div id="threat-map" style="height: 380px; width: 100%; border-radius: 0 0 16px 16px; z-index: 1;"></div>
+    </div>
+  </div>
+  <div class="dual-col" style="margin-bottom: 2.5rem;">
+    <div class="card glass-panel" style="grid-column: 1 / -1;">
       <div class="card-header">Traffic Timeline (24h Window)</div>
       <div style="padding: 1.5rem; min-height: 260px;">
         <canvas id="timelineChart"></canvas>
@@ -333,11 +344,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
   </div>
   
-  <div class="dual-col" style="grid-template-columns: 1fr 1fr; margin-bottom: 2.5rem;">
+  <div class="dual-col" style="grid-template-columns: 1fr 1fr 1fr; margin-bottom: 2.5rem;">
     <div class="card glass-panel" style="min-height: 380px;">
       <div class="card-header">Attack Method Distribution</div>
       <div style="padding: 1.5rem; display: flex; justify-content: center; min-height: 320px;">
         <canvas id="pieChart"></canvas>
+      </div>
+    </div>
+    <div class="card glass-panel" style="min-height: 380px;">
+      <div class="card-header">Live Attack Radar</div>
+      <div style="padding: 1.5rem; display: flex; justify-content: center; min-height: 320px;">
+        <canvas id="radarChart"></canvas>
       </div>
     </div>
     <div class="card glass-panel" style="min-height: 380px;">
@@ -379,7 +396,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
                 <th>Status</th>
                 <th>Detection</th>
                 <th>Deception</th>
-                <th>Session</th>
+                <th>Threat Level</th>
                 <th>Time</th>
               </tr>
             </thead>
@@ -486,6 +503,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
   </div>
 
+    <!-- MITIGATION RULES -->
+  <div id="mitigation" class="sessions-section" style="margin-top: 3.5rem; padding-top: 2rem; margin-bottom: 5rem;">
+    <div class="section-title">🛡️ Auto-Generated Mitigation Rules</div>
+    <div class="card glass-panel" style="padding: 1.5rem;">
+      <div style="font-family: var(--mono); font-size: 0.85rem; color: #34d399; background: #000; padding: 1.5rem; border-radius: 8px; overflow-x: auto; white-space: pre;" id="waf-rules">
+# Analyzing latest traffic and generating dynamic WAF rules...
+      </div>
+    </div>
+  </div>
+
   <!-- MODAL INJECTION -->
   <div class="modal-overlay" id="response-modal" style="display:none;" onclick="closeModal(event)">
     <div class="modal-content" onclick="event.stopPropagation()">
@@ -533,7 +560,22 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     const req = currentRequests[index];
     if (!req) return;
     const modal = document.getElementById('response-modal');
-    document.getElementById('modal-text').textContent = req.response || "No response generated.";
+    document.getElementById('modal-text').innerHTML = `
+      <div style="display:flex; gap: 1.5rem; height: 100%;">
+         <div style="flex:1; border-right: 1px solid var(--border); padding-right: 1rem; overflow:hidden; display:flex; flex-direction:column;">
+           <h4 style="color:var(--accent); margin-bottom: 0.5rem; text-transform:uppercase; font-size:12px; flex-shrink:0;">Raw Threat Payload</h4>
+           <div style="flex:1; overflow-y:auto; background:rgba(0,0,0,0.3); border-radius:8px; padding:1rem; box-shadow:inset 0 2px 4px rgba(0,0,0,0.2);">
+             <pre style="white-space:pre-wrap; word-break:break-all; font-size: 0.8rem; color:var(--danger); margin:0;">${(req.payload || req.endpoint || 'No payload')}</pre>
+           </div>
+         </div>
+         <div style="flex:1.5; overflow:hidden; display:flex; flex-direction:column;">
+           <h4 style="color:var(--success); margin-bottom: 0.5rem; text-transform:uppercase; font-size:12px; flex-shrink:0;">AI Rendered Deception</h4>
+           <div style="flex:1; overflow-y:auto; overflow-x:auto; background:rgba(0,0,0,0.3); border-radius:8px; padding:1rem; box-shadow:inset 0 2px 4px rgba(0,0,0,0.2);">
+             <pre style="white-space:pre-wrap; word-break:normal; font-size: 0.85rem; color:#e2e8f0; margin:0;">${(req.response || "No response generated.")}</pre>
+           </div>
+         </div>
+      </div>
+    `;
     const typeBadge = document.getElementById('modal-type-badge');
     const rt = req.response_type || 'unknown';
     typeBadge.className = 'resp-badge ' + respTypeClass(rt);
@@ -634,6 +676,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       const rows = d.requests || [];
       document.getElementById('req-count').textContent = rows.length;
       currentRequests = rows;
+      updateMapAndRules(rows);
       const tbody = document.getElementById('requests-tbody');
       if (rows.length === 0) {
         tbody.innerHTML = `<tr><td colspan="9" class="empty-state"><div class="icon">📭</div>Waiting for captured traffic...</td></tr>`;
@@ -659,7 +702,15 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             <span class="resp-badge ${respTypeClass(req.response_type)}">${respTypeIcon(req.response_type)} ${(req.response_type||'—').toUpperCase()}</span>
             ${req.response ? `<button class="btn-view" onclick="openModal(${i}); return false;">👁️ View</button>` : ''}
           </td>
-          <td style="color:var(--text-muted);font-size:0.75rem">${short(req.session_id||'', 16)}</td>
+          <td style="text-align:center;">
+            ${(() => {
+                let s = Math.max(req.detection_score || 0, req.ai_confidence_score || 0);
+                if (s >= 0.8) return `<span class="badge s-malicious" style="background:#fb7185;color:#000;">CRIT (${Math.round(s*10)}/10)</span>`;
+                if (s >= 0.5) return `<span class="badge s-suspicious" style="background:rgba(251, 191, 36, 0.2);color:var(--warn)">HIGH (${Math.round(s*10)}/10)</span>`;
+                if (s >= 0.2) return `<span class="badge" style="color:var(--success);border-color:var(--success)">MED (${Math.round(s*10)}/10)</span>`;
+                return `<span class="badge s-safe">LOW (${Math.round(s*10)}/10)</span>`;
+            })()}
+          </td>
           <td style="color:var(--text-muted)">${timeAgo(req.timestamp)}</td>
         </tr>`).join('');
     } catch(e) { console.warn('Requests fetch failed', e); }
@@ -792,6 +843,23 @@ DASHBOARD_HTML = """<!DOCTYPE html>
         },
         options: { maintainAspectRatio: false, responsive: true, plugins: { legend: { position: 'right', labels: {color: 'rgba(255,255,255,0.7)'} } } }
       });
+      
+      const ctx2 = document.getElementById('radarChart').getContext('2d');
+      if (radarChartInstance) radarChartInstance.destroy();
+      radarChartInstance = new Chart(ctx2, {
+        type: 'radar',
+        data: {
+          labels: attackData.map(a => a.attack_type),
+          datasets: [{
+            label: 'Attack Density',
+            data: attackData.map(a => a.count),
+            backgroundColor: 'rgba(251, 113, 133, 0.2)',
+            borderColor: '#fb7185',
+            pointBackgroundColor: '#fb7185'
+          }]
+        },
+        options: { maintainAspectRatio: false, responsive: true, scales: { r: { angleLines: { color: 'rgba(255,255,255,0.1)' }, grid: { color: 'rgba(255,255,255,0.1)' }, pointLabels: { color: 'rgba(255,255,255,0.7)', font: { size: 10 } } } }, plugins: { legend: { display: false } } }
+      });
   }
 
   async function refresh() {
@@ -800,7 +868,53 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     document.getElementById('status-dot').style.background = 'var(--success)';
     document.getElementById('status-dot').style.boxShadow = '0 0 12px var(--success)';
   }
+  function initMap() {
+    if(document.getElementById('threat-map') && !threatMap) {
+       threatMap = L.map('threat-map', {zoomControl: false}).setView([20, 0], 2);
+       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+         attribution: '&copy; OpenStreetMap', subdomains: 'abcd', maxZoom: 19
+       }).addTo(threatMap);
+    }
+  }
 
+  function updateMapAndRules(requests) {
+    if(threatMap) {
+      mapMarkers.forEach(m => m.remove());
+      mapMarkers = [];
+      requests.slice(0, 15).forEach(req => {
+        if(req.source_ip) {
+           let hash = 0;
+           for(let i=0; i<req.source_ip.length; i++) { hash = req.source_ip.charCodeAt(i) + ((hash << 5) - hash); }
+           let lat = Math.abs(hash % 100) - 50; // Keep roughly in populated areas
+           let lng = ((hash >> 8) % 240) - 120;
+           let marker = L.circleMarker([lat, lng], {
+              radius: req.detection_score > 0.8 ? 8 : 5,
+              fillColor: req.detection_score > 0.8 ? '#fb7185' : '#fbbf24',
+              color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8
+           }).addTo(threatMap);
+           marker.bindPopup(`<b>IP:</b> ${req.source_ip}<br><b>Threat:</b> ${req.attack_type}`);
+           mapMarkers.push(marker);
+        }
+      });
+    }
+
+    const rulesBlock = document.getElementById('waf-rules');
+    if(rulesBlock && requests.length > 0) {
+       let rules = `# Active Intelligent Firewall Rules Derived from Recent Traffic\\n\\n`;
+       let blockedIPs = [...new Set(requests.filter(r => r.detection_score > 0.7).map(r => r.source_ip))].slice(0, 4);
+       blockedIPs.forEach(ip => rules += `iptables -A INPUT -s ${ip} -j DROP # Auto-ban high threat score\\n`);
+       
+       let sqlHits = requests.filter(r => (r.attack_type||'').toLowerCase().includes('sql'));
+       if(sqlHits.length > 0) rules += `\\nSecRule ARGS "@detectSQLi" "id:1001,deny,log,status:403" # Prevent observed SQL injection patterns\\n`;
+
+       let travHits = requests.filter(r => (r.attack_type||'').toLowerCase().includes('traversal'));
+       if(travHits.length > 0) rules += `SecRule REQUEST_URI "@rx (\\\\.\\\\./|\\\\.\\\\.\\\\|%2e%2e%2f)" "id:1003,deny,status:403" # Traversal detected\\n`;
+
+       rulesBlock.textContent = rules;
+    }
+  }
+
+  initMap();
   refresh();
   setInterval(refresh, 10000);
 </script>

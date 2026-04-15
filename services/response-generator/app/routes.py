@@ -49,7 +49,7 @@ async def generate_response(req: DeceptionRequest):
     """
 
     # 1. Check cache first — ALWAYS before LLM
-    cached = get_cached_response(req.payload, req.attack_type)
+    cached = get_cached_response(req.payload, req.endpoint, req.attack_type)
     if cached:
         logger.info(
             f"Cache hit for {req.attack_type} (cache size: {cache_size()})",
@@ -81,8 +81,9 @@ async def generate_response(req: DeceptionRequest):
         attack_type=req.attack_type,
     )
 
-    # 3. Cache the new response (even fallback, to prevent repeated LLM calls)
-    set_cached_response(req.payload, req.attack_type, res_text, res_type)
+    # 3. Cache successful responses only — never cache fallbacks so retries work
+    if res_type != "fallback":
+        set_cached_response(req.payload, req.endpoint, req.attack_type, res_text, res_type)
 
     logger.info(
         f"Response generated for {req.attack_type} (type: {res_type})",

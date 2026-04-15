@@ -22,19 +22,19 @@ MAX_CACHE_SIZE = 1024
 _cache: OrderedDict[str, dict] = OrderedDict()
 
 
-def _make_key(payload: str, attack_type: str) -> str:
-    """Generate a deterministic cache key from payload + attack_type."""
-    raw = f"{payload}::{attack_type}"
+def _make_key(payload: str, endpoint: str, attack_type: str) -> str:
+    """Generate a deterministic cache key from payload, endpoint + attack_type."""
+    raw = f"{payload}::{endpoint}::{attack_type}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
-def get_cached_response(payload: str, attack_type: str) -> Optional[dict]:
+def get_cached_response(payload: str, endpoint: str, attack_type: str) -> Optional[dict]:
     """
     Look up a cached response.
     Returns {"response": str, "response_type": str} on hit, None on miss.
     Moves the entry to the end (most-recently-used) on hit.
     """
-    key = _make_key(payload, attack_type)
+    key = _make_key(payload, endpoint, attack_type)
     if key in _cache:
         _cache.move_to_end(key)
         logger.info(f"Cache HIT for key {key[:12]}...")
@@ -42,12 +42,12 @@ def get_cached_response(payload: str, attack_type: str) -> Optional[dict]:
     return None
 
 
-def set_cached_response(payload: str, attack_type: str, response: str, response_type: str) -> None:
+def set_cached_response(payload: str, endpoint: str, attack_type: str, response: str, response_type: str) -> None:
     """
     Store a response in the cache. Evicts the oldest entry if the cache
     exceeds MAX_CACHE_SIZE (LRU policy).
     """
-    key = _make_key(payload, attack_type)
+    key = _make_key(payload, endpoint, attack_type)
     _cache[key] = {"response": response, "response_type": response_type}
     _cache.move_to_end(key)
 
