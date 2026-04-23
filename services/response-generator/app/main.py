@@ -10,6 +10,7 @@ Endpoints:
 
 import logging
 import sys
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routes import router
@@ -22,10 +23,45 @@ logging.basicConfig(
 )
 logger = logging.getLogger("response_generator")
 
+
+async def _warmup_model():
+    """
+    Send a tiny request to Ollama on startup to pre-load the model into memory.
+    Prevents the first deception response from timing out due to cold start.
+    """
+    from app.client import LLM_API_URL, MODEL_NAME
+    import httpx
+    logger.info(f"Warming up LLM model '{MODEL_NAME}' at {LLM_API_URL}...")
+    try:
+        # Use the /api/generate endpoint (same as client.py uses)
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            resp = await client.post(
+                LLM_API_URL,
+                json={
+                    "model": MODEL_NAME,
+                    "prompt": "Say OK",
+                    "stream": False,
+                    "options": {"num_predict": 5},
+                    "keep_alive": "10m",
+                },
+            )
+            resp.raise_for_status()
+            logger.info(f"Model warm-up complete — '{MODEL_NAME}' is loaded and ready")
+    except Exception as exc:
+        logger.warning(f"Model warm-up failed (will retry on first request): {exc}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await _warmup_model()
+    yield
+
+
 app = FastAPI(
     title="CyberShield Deception Response Generator",
     description="LLM-based context-aware fake response generator for CyberShield honeypot",
     version="2.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -48,3 +84,4 @@ async def health_check():
 async def cache_stats():
     from app.cache import cache_size
     return {"cache_entries": cache_size(), "max_cache_size": 1024}
+

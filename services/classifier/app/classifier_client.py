@@ -27,7 +27,7 @@ logger = logging.getLogger("classifier")
 # ---------------------------------------------------------------------------
 PHI_MODEL_URL: str = os.environ.get("PHI_MODEL_URL", "http://host.docker.internal:11434").rstrip("/")
 PHI_MODEL_NAME: str = os.environ.get("PHI_MODEL_NAME", "phi3")
-TIMEOUT: float = float(os.environ.get("CLASSIFIER_TIMEOUT", "12"))
+TIMEOUT: float = float(os.environ.get("CLASSIFIER_TIMEOUT", "60"))
 
 # Attack categories the model is asked to choose from
 ATTACK_CATEGORIES = [
@@ -41,7 +41,6 @@ ATTACK_CATEGORIES = [
     "Directory Enumeration",
     "Server-Side Request Forgery (SSRF)",
     "XML Injection",
-    "Broken Access Control",
     "Broken Access Control",
     "Port Scanning / Reconnaissance",
     "None / Benign"
@@ -80,6 +79,13 @@ Headers:
 {header_str}
 Payload:
 {payload_str}
+
+=== CATEGORY HINTS ===
+- Broken Access Control: Modifying/Accessing unauthorized IDs or roles (e.g. DELETE /users/1, IDOR).
+- Command Injection: Executing OS shell commands using pipes '|', semicolons ';', or '&' (e.g. tail, cat, ls).
+- SSRF: Making the server send HTTP/network requests (e.g. url=http://localhost).
+- Directory Enumeration: Probing for hidden paths/files (e.g. /actuator/health, /.env).
+- SQL Injection: Evading SQL filters using AND/OR logic, quotes, or LENGTH/DATABASE() queries.
 
 === TASK ===
 1. Determine if this request is 'benign' (normal traffic) or 'malicious' (an attack).

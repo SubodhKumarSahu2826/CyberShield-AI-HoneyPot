@@ -249,8 +249,10 @@ async def capture_request(path: str, request: Request) -> Response:
         row_id = -1
         slogger.error(f"Database insert error: {exc}", extra={"event_type": "db_error"})
 
-    # 7. Enqueue Async AI Classification (Day 5)
-    if final_status == "suspicious" and row_id != -1:
+    # 7. Enqueue Async AI Classification for evaded requests (Day 5 + Evasion Defense)
+    #    Only if the rule-based engine MISSED the attack (not malicious).
+    #    This avoids wasting LLM resources when the rule engine already caught it.
+    if row_id != -1 and final_status != "malicious":
         job = ClassificationJob(
             request_id=row_id,
             method=method,
@@ -261,7 +263,9 @@ async def capture_request(path: str, request: Request) -> Response:
             session_id=session_id,
         )
         queue_manager.enqueue(job)
-        slogger.debug(f"Enqueued async classification for {row_id}")
+        slogger.debug(f"Enqueued async classification for {row_id} (rule_status={final_status})")
+    elif row_id != -1:
+        slogger.debug(f"Skipping AI classification for {row_id} - already caught by rule engine.")
 
 
     # 8. Return convincing fake response (Milestone 2A)

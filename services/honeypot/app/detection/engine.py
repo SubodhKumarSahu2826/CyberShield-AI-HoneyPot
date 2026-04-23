@@ -106,10 +106,25 @@ def analyze(
             combined_len < 500
             and not has_encoding
             and not any(kw in lower_surface for kw in [
+                # Original heuristic keywords
                 'passwd', 'shadow', 'admin', 'root', 'shell', 'exec',
                 'system(', 'eval(', 'base64', 'cmd', '<!--', 'entity',
                 'doctype', '<!', 'file://', 'meta-data', '$gt', '$ne',
                 '$regex', 'security-credentials', '/internal',
+                # SSTI / Template Injection indicators
+                '{{', '{%', '__class__', '__globals__', '__init__',
+                '__builtins__', 'popen', '__import__', 'config.',
+                # Log4Shell / JNDI injection
+                'jndi', 'ldap://', 'rmi://', '${',
+                # Obfuscated SQL / comment-stuffed
+                '/**/', 'uni0n', 'sel ect', 'fr0m', 'inf0rmation',
+                # Deserialization / prototype pollution
+                '__proto__', 'constructor', 'rO0AB', 'aced0005',
+                # SSRF additional patterns
+                '169.254.169.254', 'metadata.google', 'metadata.azure',
+                '127.0.0.1', '0x7f000001',
+                # Header injection / request smuggling
+                '\\r\\n', 'transfer-encoding', 'content-length:',
             ])
         )
 

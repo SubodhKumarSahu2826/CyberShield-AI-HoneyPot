@@ -167,14 +167,24 @@ async def update_request_classification(
     ai_attack_type: str,
     ai_confidence_score: float,
 ) -> None:
-    """Async updater for the background AI inference pipeline (Day 5)."""
+    """Async updater for the background AI inference pipeline (Day 5).
+    
+    Also updates the `attack_type` column when the AI detects an evasion
+    attack that the rule engine missed (i.e. when the current attack_type
+    is 'none' or 'unknown' but the AI identified a real attack).
+    """
     pool = await get_db_pool()
     await pool.execute(
         """
         UPDATE requests 
-        SET detection_status = $2, 
-            ai_attack_type = $3, 
-            ai_confidence_score = $4 
+        SET detection_status   = $2, 
+            ai_attack_type     = $3, 
+            ai_confidence_score = $4,
+            attack_type = CASE
+                WHEN attack_type IN ('none', 'unknown', '') AND $3 != '' AND $3 != 'model_unavailable' AND $3 != 'None / Benign'
+                THEN $3
+                ELSE attack_type
+            END
         WHERE id = $1
         """,
         request_id,
@@ -182,7 +192,7 @@ async def update_request_classification(
         ai_attack_type,
         ai_confidence_score,
     )
-    logger.debug(f"DB updated AI classification for request {request_id} -> {detection_status}")
+    logger.debug(f"DB updated AI classification for request {request_id} -> {detection_status} (ai_type={ai_attack_type})")
 
 
 async def update_request_response(

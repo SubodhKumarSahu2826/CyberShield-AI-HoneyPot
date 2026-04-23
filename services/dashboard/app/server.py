@@ -253,16 +253,12 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     .animate-in { animation: slideUp 0.4s ease-out; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
     Chart.defaults.color = 'rgba(148, 163, 184, 0.8)';
     Chart.defaults.font.family = "'Outfit', sans-serif";
     let timelineChartInstance = null;
     let pieChartInstance = null;
     let radarChartInstance = null;
-    let threatMap = null;
-    let mapMarkers = [];
   </script>
 </head>
 <body>
@@ -331,14 +327,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
   <div id="analytics" class="section-title" style="margin-top: 1rem; padding-top: 2rem;">📈 Analytics & Threat Feed</div>
   <div class="dual-col" style="margin-bottom: 2.5rem;">
     <div class="card glass-panel" style="grid-column: 1 / -1;">
-      <div class="card-header">Live Geo-IP Threat Map</div>
-      <div id="threat-map" style="height: 380px; width: 100%; border-radius: 0 0 16px 16px; z-index: 1;"></div>
-    </div>
-  </div>
-  <div class="dual-col" style="margin-bottom: 2.5rem;">
-    <div class="card glass-panel" style="grid-column: 1 / -1;">
-      <div class="card-header">Traffic Timeline (24h Window)</div>
-      <div style="padding: 1.5rem; min-height: 260px;">
+      <div class="card-header">
+        Traffic Timeline (24h Window)
+        <span class="badge" id="timeline-count" style="font-size:0.7rem;">0 events</span>
+      </div>
+      <div style="padding: 1.5rem; height: 320px; position: relative;">
         <canvas id="timelineChart"></canvas>
       </div>
     </div>
@@ -691,12 +684,41 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             ${req.source_ip}
             ${req.attacker_type && req.attacker_type !== 'unknown' ? `<br><span style="font-size:0.65rem;color:var(--warn)">[${req.attacker_type}] Score: ${Math.round(req.attacker_score||0)}/10</span>` : ''}
           </td>
-          <td><span class="status-badge ${statusClass(req.detection_status)}">${req.detection_status||'—'}</span></td>
           <td>
-            ${req.attack_type !== 'unknown' ? `<div style="color:var(--danger);font-weight:600;">${short(req.attack_type, 35)}</div>` : ((req.ai_attack_type && req.ai_attack_type !== 'model_unavailable' && req.ai_attack_type !== 'Unknown Anomaly' && req.ai_attack_type !== 'None / Benign') ? '' : '<div style="color:var(--text-muted);font-weight:400;font-size:0.75rem">—</div>')}
-            ${req.ai_attack_type && req.ai_attack_type !== 'model_unavailable' && req.ai_attack_type !== '' && req.ai_attack_type !== 'Unknown Anomaly' && req.ai_attack_type !== 'None / Benign'
-              ? `<div style="color:var(--accent);font-size:0.7rem;margin-top:${req.attack_type !== 'unknown' ? '4px' : '0'};">🤖 AI: ${short(req.ai_attack_type, 25)} (${Math.round((req.ai_confidence_score||0)*100)}%)</div>` 
-              : `<div style="color:var(--text-muted);font-size:0.65rem;margin-top:4px;opacity:0.6">🤖 AI: Unclassified</div>`}
+            ${(() => {
+              const aiCaught = req.ai_attack_type && req.ai_attack_type !== 'model_unavailable' && req.ai_attack_type !== '' && req.ai_attack_type !== 'Unknown Anomaly' && req.ai_attack_type !== 'None / Benign';
+              const ruleCaught = req.attack_type && req.attack_type !== 'unknown' && req.attack_type !== 'none';
+              if (ruleCaught && aiCaught) return `<span class="status-badge s-malicious">malicious</span><div style="font-size:0.6rem;color:var(--accent);margin-top:3px;">✅ Rule + AI</div>`;
+              if (ruleCaught) return `<span class="status-badge s-malicious">malicious</span><div style="font-size:0.6rem;color:var(--text-muted);margin-top:3px;">✅ Rule-based</div>`;
+              if (aiCaught) return `<span class="status-badge" style="background:rgba(56,189,248,0.2);color:#38bdf8;border-color:rgba(56,189,248,0.4);box-shadow:0 0 12px rgba(56,189,248,0.3);">🤖 AI DETECTED</span>`;
+              if (req.detection_status === 'safe') return `<span class="status-badge s-safe">safe</span>`;
+              return `<span class="status-badge s-suspicious">${req.detection_status||'suspicious'}</span>`;
+            })()}
+          </td>
+          <td>
+            ${(() => {
+              const aiType = req.ai_attack_type || '';
+              const aiValid = aiType && aiType !== 'model_unavailable' && aiType !== 'Unknown Anomaly' && aiType !== 'None / Benign';
+              const ruleType = req.attack_type || 'unknown';
+              const ruleBypassed = ruleType === 'unknown' || ruleType === 'none';
+
+              if (!ruleBypassed && aiValid) {
+                return `<div style="color:var(--danger);font-weight:600;">${short(ruleType, 30)}</div>` +
+                  `<div style="color:var(--accent);font-size:0.7rem;margin-top:4px;">🤖 AI: ${short(aiType,25)} (${Math.round((req.ai_confidence_score||0)*100)}%)</div>`;
+              }
+              if (ruleBypassed && aiValid) {
+                return `<div style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:8px;background:linear-gradient(135deg,rgba(56,189,248,0.15),rgba(129,140,248,0.15));border:1px solid rgba(56,189,248,0.4);box-shadow:0 0 15px rgba(56,189,248,0.15);margin-bottom:3px;">` +
+                  `<span style="font-size:0.78rem;font-weight:700;color:#38bdf8;">🤖 ${short(aiType,25)}</span>` +
+                  `<span style="font-size:0.65rem;color:var(--warn);font-weight:600;">${Math.round((req.ai_confidence_score||0)*100)}%</span></div>` +
+                  `<div style="font-size:0.6rem;color:var(--text-muted);margin-top:2px;">⚠️ Bypassed rules — caught by AI</div>`;
+              }
+              if (!ruleBypassed) {
+                return `<div style="color:var(--danger);font-weight:600;">${short(ruleType, 30)}</div>` +
+                  `<div style="color:var(--text-muted);font-size:0.65rem;margin-top:4px;opacity:0.6">🤖 AI: Unclassified</div>`;
+              }
+              return `<div style="color:var(--text-muted);font-size:0.75rem;">—</div>` +
+                `<div style="color:var(--text-muted);font-size:0.65rem;margin-top:4px;opacity:0.6">🤖 AI: Unclassified</div>`;
+            })()}
           </td>
           <td>
             <span class="resp-badge ${respTypeClass(req.response_type)}">${respTypeIcon(req.response_type)} ${(req.response_type||'—').toUpperCase()}</span>
@@ -788,17 +810,96 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       if (!r.ok) return;
       const d = await r.json();
       const rows = d.timeline || [];
-      const labels = rows.map(r => new Date(r.time_bucket).getHours() + ':00');
-      const data = rows.map(r => r.event_count);
-      
+
+      // Build full 24h label set for a complete timeline
+      const now = new Date();
+      const hourMap = {};
+      rows.forEach(r => {
+        const dt = new Date(r.time_bucket);
+        const key = dt.getFullYear() + '-' + String(dt.getMonth()).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0') + 'T' + String(dt.getHours()).padStart(2,'0');
+        hourMap[key] = (hourMap[key] || 0) + r.event_count;
+      });
+
+      const labels = [];
+      const data = [];
+      for (let i = 23; i >= 0; i--) {
+        const t = new Date(now.getTime() - i * 3600000);
+        const key = t.getFullYear() + '-' + String(t.getMonth()).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0') + 'T' + String(t.getHours()).padStart(2,'0');
+        const h = t.getHours();
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const h12 = h % 12 || 12;
+        labels.push(h12 + ' ' + ampm);
+        data.push(hourMap[key] || 0);
+      }
+
+      const totalEvents = data.reduce((a, b) => a + b, 0);
+      const badge = document.getElementById('timeline-count');
+      if (badge) badge.textContent = totalEvents + ' events';
+
       const ctx = document.getElementById('timelineChart').getContext('2d');
       if (timelineChartInstance) timelineChartInstance.destroy();
+
+      const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+      gradient.addColorStop(0, 'rgba(56, 189, 248, 0.35)');
+      gradient.addColorStop(1, 'rgba(56, 189, 248, 0.0)');
+
       timelineChartInstance = new Chart(ctx, {
         type: 'line',
         data: { labels, datasets: [{
-          label: 'Requests', data, borderColor: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.2)', borderWidth: 2, fill: true, tension: 0.4
+          label: 'Requests',
+          data,
+          borderColor: '#38bdf8',
+          backgroundColor: gradient,
+          borderWidth: 2.5,
+          fill: true,
+          tension: 0.35,
+          pointRadius: 3,
+          pointBackgroundColor: '#38bdf8',
+          pointBorderColor: 'rgba(6, 11, 20, 0.9)',
+          pointBorderWidth: 2,
+          pointHoverRadius: 6,
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: '#38bdf8',
+          pointHoverBorderWidth: 3
         }]},
-        options: { maintainAspectRatio: false, responsive: true }
+        options: {
+          maintainAspectRatio: false,
+          responsive: true,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(17, 24, 39, 0.95)',
+              titleColor: '#f8fafc',
+              bodyColor: '#94a3b8',
+              borderColor: 'rgba(56, 189, 248, 0.3)',
+              borderWidth: 1,
+              padding: 12,
+              cornerRadius: 8,
+              displayColors: false,
+              callbacks: {
+                title: function(items) { return '🕐 ' + items[0].label; },
+                label: function(item) { return '  ' + item.parsed.y + ' request' + (item.parsed.y !== 1 ? 's' : ''); }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(51, 65, 85, 0.3)', drawBorder: false },
+              ticks: { color: 'rgba(148, 163, 184, 0.7)', font: { size: 11, family: "'Outfit', sans-serif" }, maxRotation: 0 }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(51, 65, 85, 0.2)', drawBorder: false },
+              ticks: {
+                color: 'rgba(148, 163, 184, 0.7)',
+                font: { size: 11, family: "'Outfit', sans-serif" },
+                stepSize: 1,
+                callback: function(v) { return Number.isInteger(v) ? v : ''; }
+              }
+            }
+          }
+        }
       });
     } catch(e) { console.warn('Analytics fetch failed', e); }
   }
@@ -868,36 +969,8 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     document.getElementById('status-dot').style.background = 'var(--success)';
     document.getElementById('status-dot').style.boxShadow = '0 0 12px var(--success)';
   }
-  function initMap() {
-    if(document.getElementById('threat-map') && !threatMap) {
-       threatMap = L.map('threat-map', {zoomControl: false}).setView([20, 0], 2);
-       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-         attribution: '&copy; OpenStreetMap', subdomains: 'abcd', maxZoom: 19
-       }).addTo(threatMap);
-    }
-  }
 
   function updateMapAndRules(requests) {
-    if(threatMap) {
-      mapMarkers.forEach(m => m.remove());
-      mapMarkers = [];
-      requests.slice(0, 15).forEach(req => {
-        if(req.source_ip) {
-           let hash = 0;
-           for(let i=0; i<req.source_ip.length; i++) { hash = req.source_ip.charCodeAt(i) + ((hash << 5) - hash); }
-           let lat = Math.abs(hash % 100) - 50; // Keep roughly in populated areas
-           let lng = ((hash >> 8) % 240) - 120;
-           let marker = L.circleMarker([lat, lng], {
-              radius: req.detection_score > 0.8 ? 8 : 5,
-              fillColor: req.detection_score > 0.8 ? '#fb7185' : '#fbbf24',
-              color: '#fff', weight: 1, opacity: 1, fillOpacity: 0.8
-           }).addTo(threatMap);
-           marker.bindPopup(`<b>IP:</b> ${req.source_ip}<br><b>Threat:</b> ${req.attack_type}`);
-           mapMarkers.push(marker);
-        }
-      });
-    }
-
     const rulesBlock = document.getElementById('waf-rules');
     if(rulesBlock && requests.length > 0) {
        let rules = `# Active Intelligent Firewall Rules Derived from Recent Traffic\\n\\n`;
@@ -914,7 +987,6 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     }
   }
 
-  initMap();
   refresh();
   setInterval(refresh, 10000);
 </script>

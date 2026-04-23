@@ -26,7 +26,7 @@ logger = logging.getLogger("honeypot")
 CLASSIFIER_HOST: str = os.environ.get("CLASSIFIER_HOST", "classifier")
 CLASSIFIER_PORT: str = os.environ.get("CLASSIFIER_PORT", "5001")
 CLASSIFIER_URL:  str = f"http://{CLASSIFIER_HOST}:{CLASSIFIER_PORT}"
-TIMEOUT: float = float(os.environ.get("CLASSIFIER_CLIENT_TIMEOUT", "10"))
+TIMEOUT: float = float(os.environ.get("CLASSIFIER_CLIENT_TIMEOUT", "60"))
 
 _FALLBACK = {"ai_classification_status": "benign", "ai_attack_type": "model_unavailable", "ai_confidence_score": 0.0}
 

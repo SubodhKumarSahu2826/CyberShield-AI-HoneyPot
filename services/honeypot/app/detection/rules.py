@@ -45,7 +45,7 @@ SQL_INJECTION_RULES: list[Rule] = [
     {"pattern": _c(r"\b(INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b"),     "attack_type": "SQL Injection", "confidence": 0.85},
     {"pattern": _c(r"\bDROP\s+TABLE\b"),                                          "attack_type": "SQL Injection", "confidence": 0.99},
     {"pattern": _c(r"\binformation_schema\b"),                                    "attack_type": "SQL Injection", "confidence": 0.93},
-    {"pattern": _c(r"(\'|\"|`)\s*(;|--|\#)"),                                    "attack_type": "SQL Injection", "confidence": 0.88},
+    {"pattern": _c(r"(\'|\"|`)\s*(--|\#)"),                                       "attack_type": "SQL Injection", "confidence": 0.88},
     {"pattern": _c(r"\bEXEC(\s|\()+\b"),                                          "attack_type": "SQL Injection", "confidence": 0.90},
     {"pattern": _c(r"\bSLEEP\s*\(\s*\d+\s*\)"),                                  "attack_type": "SQL Injection", "confidence": 0.95},  # Time-based blind
     {"pattern": _c(r"\bWAITFOR\s+DELAY\b"),                                      "attack_type": "SQL Injection", "confidence": 0.95},
