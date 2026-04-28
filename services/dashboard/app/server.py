@@ -55,7 +55,29 @@ DASHBOARD_HTML = """<!DOCTYPE html>
       --mono:       'JetBrains Mono', monospace;
       --radius:     16px;
     }
-    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+    body.light-mode {
+      --bg:         #f8fafc;
+      --bg2:        rgba(255, 255, 255, 0.85);
+      --border:     rgba(203, 213, 225, 0.8);
+      --text:       #0f172a;
+      --text-muted: #475569;
+    }
+    body.light-mode header { background: rgba(255, 255, 255, 0.85); }
+    body.light-mode .card-header { background: rgba(0, 0, 0, 0.03); border-bottom: 1px solid rgba(0, 0, 0, 0.1); }
+    body.light-mode .navbar { background: rgba(255, 255, 255, 0.7); border-bottom: 1px solid rgba(0, 0, 0, 0.1); }
+    body.light-mode thead th { background: rgba(248, 250, 252, 0.95); border-bottom: 1px solid rgba(0, 0, 0, 0.1); color: #64748b; }
+    body.light-mode tbody tr:hover { background: rgba(0, 0, 0, 0.03); }
+    body.light-mode .modal-content { background: rgba(255, 255, 255, 0.95); }
+    body.light-mode .modal-header { background: rgba(0, 0, 0, 0.05); }
+    body.light-mode .modal-body { color: #334155; }
+    body.light-mode .empty-state { color: #64748b; }
+    body.light-mode footer { background: rgba(0, 0, 0, 0.05); }
+    body.light-mode .glass-panel { box-shadow: 0 10px 30px -10px rgba(0,0,0,0.1); }
+    body.light-mode #waf-rules { background: #f1f5f9; color: #059669; }
+    body.light-mode .stat-card::before { background: radial-gradient(circle at top right, rgba(0,0,0,0.03), transparent 60%); }
+    body.light-mode .logo-icon { box-shadow: 0 8px 20px rgba(129, 140, 248, 0.2); }
+
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; transition: background 0.3s, color 0.3s; }
 
     /* GLOW BACKGROUND */
     .glow-bg { position: fixed; inset: 0; overflow: hidden; z-index: -1; pointer-events: none; }
@@ -276,6 +298,7 @@ DASHBOARD_HTML = """<!DOCTYPE html>
     </div>
   </div>
   <div class="header-right">
+    <button onclick="toggleTheme()" id="theme-toggle" style="background:rgba(0,0,0,0.1); border:1px solid var(--border); color:var(--text); padding:0.4rem 0.8rem; border-radius:8px; cursor:pointer; font-size:0.75rem; font-family:var(--font); font-weight:600; box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);">☀️ Light</button>
     <div style="display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.3);padding:0.4rem 1rem;border-radius:999px;border:1px solid var(--border);box-shadow:inset 0 1px 0 rgba(255,255,255,0.05);">
       <span class="status-dot" id="status-dot"></span>
       <span class="last-update" id="last-update">Connecting...</span>
@@ -989,6 +1012,39 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
   refresh();
   setInterval(refresh, 10000);
+
+  // ── Theme Toggle ─────────────────────────────────────────
+  function toggleTheme() {
+    const isLight = document.body.classList.toggle('light-mode');
+    localStorage.setItem('theme', isLight ? 'light' : 'dark');
+    document.getElementById('theme-toggle').textContent = isLight ? '🌙 Dark' : '☀️ Light';
+    
+    const textColor = isLight ? '#475569' : 'rgba(148, 163, 184, 0.8)';
+    Chart.defaults.color = textColor;
+    if (timelineChartInstance) { 
+      timelineChartInstance.options.scales.x.ticks.color = textColor; 
+      timelineChartInstance.options.scales.y.ticks.color = textColor; 
+      timelineChartInstance.update(); 
+    }
+    if (pieChartInstance) { 
+      pieChartInstance.options.plugins.legend.labels.color = textColor; 
+      pieChartInstance.update(); 
+    }
+    if (radarChartInstance) { 
+      radarChartInstance.options.plugins.legend.labels.color = textColor; 
+      radarChartInstance.options.scales.r.ticks.color = textColor; 
+      radarChartInstance.options.scales.r.pointLabels.color = textColor; 
+      radarChartInstance.update(); 
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    if (localStorage.getItem('theme') === 'light') {
+      document.body.classList.add('light-mode');
+      document.getElementById('theme-toggle').textContent = '🌙 Dark';
+      Chart.defaults.color = '#475569';
+    }
+  });
 </script>
 </body>
 </html>"""

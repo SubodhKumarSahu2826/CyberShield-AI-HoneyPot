@@ -23,7 +23,26 @@
       --font: 'Inter', -apple-system, sans-serif;
       --radius: 12px;
     }
-    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+    body.light-mode {
+      --bg: #f8fafc;
+      --bg2: #ffffff;
+      --bg3: #e2e8f0;
+      --border: #cbd5e1;
+      --text: #0f172a;
+      --muted: #64748b;
+    }
+    body.light-mode .topbar { background: rgba(255, 255, 255, 0.95); border-bottom: 1px solid rgba(0, 0, 0, 0.1); }
+    body.light-mode .sidebar { background: rgba(248, 250, 252, 0.95); border-right: 1px solid rgba(0, 0, 0, 0.1); }
+    body.light-mode .sidebar-item:hover { background: rgba(0, 0, 0, 0.05); }
+    body.light-mode .card-head { background: rgba(0, 0, 0, 0.03); border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+    body.light-mode input, body.light-mode textarea, body.light-mode select { background: #ffffff; color: var(--text); }
+    body.light-mode .response-panel { background: rgba(241, 245, 249, 0.8); border-color: rgba(0,0,0,0.1); }
+    body.light-mode .response-header { background: rgba(0, 0, 0, 0.05); border-bottom: 1px solid rgba(0, 0, 0, 0.08); }
+    body.light-mode .response-body { color: #1e293b; }
+    body.light-mode .topbar-link:hover { background: rgba(0,0,0,0.05); }
+    body.light-mode .tbl tr:hover td { background: rgba(0,0,0,0.02); }
+
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.3s, color 0.3s; }
 
     /* HEADER */
     .topbar { display:flex; align-items:center; justify-content:space-between; padding:0.75rem 2rem;
@@ -169,6 +188,7 @@
     <div class="brand-name">Swift<span>Logix</span></div>
   </div>
   <div class="topbar-right">
+    <span class="topbar-link" onclick="toggleTheme()" id="theme-toggle">☀️ Light</span>
     <span class="topbar-link">Dashboard</span>
     <span class="topbar-link">Shipments</span>
     <span class="topbar-link">Reports</span>
@@ -630,6 +650,20 @@ async function doCustom() {
   const r = await honeypotFetch(ep, opts);
   showResponse('resp-custom', r.status, r.data);
 }
+
+// ── Theme Toggle ─────────────────────────────────────────
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-mode');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-toggle').textContent = isLight ? '🌙 Dark' : '☀️ Light';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (localStorage.getItem('theme') === 'light') {
+    document.body.classList.add('light-mode');
+    document.getElementById('theme-toggle').textContent = '🌙 Dark';
+  }
+});
 </script>
 </body>
 </html>
