@@ -79,6 +79,9 @@ async def generate_response(req: DeceptionRequest):
         endpoint=req.endpoint,
         method=req.method,
         attack_type=req.attack_type,
+        strategy=req.strategy,
+        attacker_type=req.attacker_type,
+        attack_pattern=req.attack_pattern,
     )
 
     # 3. Cache successful responses only — never cache fallbacks so retries work

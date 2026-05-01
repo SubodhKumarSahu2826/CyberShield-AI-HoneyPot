@@ -1,0 +1,7 @@
+CONTAINER ID   IMAGE                                         COMMAND                  CREATED        STATUS                    PORTS                                         NAMES
+e804240581a3   ai-adaptivecyberhoneypot-dashboard            "python app/server.py"   24 hours ago   Up 10 minutes (healthy)   0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp   honeypot-dashboard
+42aa5f16ec07   ai-adaptivecyberhoneypot-honeypot             "uvicorn app.main:ap…"   24 hours ago   Up 10 minutes (healthy)   0.0.0.0:8080->8080/tcp, [::]:8080->8080/tcp   honeypot-capture
+9f89e725a3c8   ai-adaptivecyberhoneypot-response-generator   "uvicorn app.main:ap…"   24 hours ago   Up 10 minutes (healthy)   3002/tcp                                      honeypot-response-generator
+683aedce029d   ai-adaptivecyberhoneypot-classifier           "uvicorn app.main:ap…"   24 hours ago   Up 10 minutes (healthy)   5001/tcp                                      honeypot-classifier
+162395e43d4a   ai-adaptivecyberhoneypot-api                  "uvicorn app.main:ap…"   24 hours ago   Up 10 minutes (healthy)   3001/tcp                                      honeypot-api
+c21cca593b6e   postgres:15-alpine                            "docker-entrypoint.s…"   12 days ago    Up 10 minutes (healthy)   5432/tcp                                      honeypot-postgres

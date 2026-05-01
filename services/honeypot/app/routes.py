@@ -304,12 +304,40 @@ async def capture_request(path: str, request: Request) -> Response:
         except Exception as exc:
             slogger.error(f"Response Gen error: {exc}", extra={"event_type": "response_gen_error"})
 
+    # --- Content-Type aware response routing ---
+    # Map response_type to proper MIME types so attackers see realistic output
+    _CONTENT_TYPE_MAP = {
+        "sql":  "text/plain",
+        "file": "text/plain",
+        "html": "text/html",
+        "xml":  "application/xml",
+        "json": "application/json",
+        "auth": "application/json",
+    }
+
+    # Realistic response headers per attack type
+    _RESPONSE_HEADERS = {
+        "X-Request-ID": request_id,
+        "Server": "Apache/2.4.54 (Ubuntu)",
+    }
+
+    content_type = _CONTENT_TYPE_MAP.get(res_type, "application/json")
+
+    # For non-JSON types, return raw Response (not JSONResponse) so the
+    # output isn't wrapped in JSON quotes — attackers see raw file/terminal/HTML
+    if content_type != "application/json":
+        # Successful exploit should return 200
+        return Response(
+            content=fake_body if isinstance(fake_body, str) else str(fake_body),
+            status_code=200,
+            media_type=content_type,
+            headers=_RESPONSE_HEADERS,
+        )
+
+    # JSON responses — use JSONResponse for proper encoding
     return JSONResponse(
         content=fake_body,
         status_code=status_code,
-
-        headers={
-            "X-Request-ID": request_id,
-            "Server": "Apache/2.4.54 (Ubuntu)",
-        },
+        headers=_RESPONSE_HEADERS,
     )
+

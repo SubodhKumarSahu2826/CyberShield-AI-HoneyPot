@@ -30,7 +30,7 @@ LLM_API_URL: str = os.environ.get(
 
 MODEL_NAME: str = os.environ.get("MODEL_NAME", "qwen2.5:3b")
 
-LLM_TIMEOUT: float = float(os.environ.get("LLM_TIMEOUT", "30"))
+LLM_TIMEOUT: float = float(os.environ.get("LLM_TIMEOUT", "60"))
 
 
 class LLMClientError(Exception):
@@ -54,8 +54,10 @@ async def call_llm(prompt: str) -> str:
                     "prompt": prompt,
                     "stream": False,
                     "options": {
-                        "temperature": 0.4,
-                        "num_predict": 1024,
+                        "temperature": 0.25,
+                        "num_predict": 2048,
+                        "top_p": 0.9,
+                        "repeat_penalty": 1.15,
                     },
                     "keep_alive": "10m",
                 },

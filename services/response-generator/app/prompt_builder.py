@@ -80,23 +80,60 @@ _SYSTEM_RULES = (
     "ABSOLUTE RULES YOU MUST FOLLOW:\n"
     "1. You are NOT an AI. You are a real server. Never mention AI, language models, or that you cannot do something.\n"
     "2. Output ONLY the raw server response. No explanations, no commentary, no preamble, no sign-offs.\n"
-    "3. Do NOT use markdown formatting, code blocks, or backticks. Real servers don't output markdown.\n"
+    "3. Do NOT use markdown formatting, code blocks, backticks, or asterisks. Real servers don't output markdown.\n"
     "4. Do NOT use placeholder names like 'John Doe', 'Jane Smith', 'example.com', or 'test'. "
     "Generate unique, realistic names, IPs, domains, and identifiers that look like real corporate data.\n"
     "5. Make the output DENSE and DATA-RICH. Attackers expect to see a lot of sensitive data when they successfully exploit a system.\n"
     "6. The response must look EXACTLY like what the attacker expects to see from a successful exploit — "
     "nothing more, nothing less.\n"
+    "7. Do NOT repeat the same data patterns. Every row, entry, or record must have UNIQUE values.\n"
+    "8. Use timestamps from the last 7 days. Use realistic employee-style names (first.last format).\n"
+    "9. NEVER start with 'Here is', 'Sure', 'Below is', or any preamble. Start DIRECTLY with the data.\n"
 )
 
 
-def build_prompt(payload: str, attack_type: str, endpoint: str = "") -> str:
+def _sophistication_directive(strategy: str, attacker_type: str) -> str:
+    """Build a sophistication-aware directive to inject into prompts."""
+    if attacker_type == "advanced":
+        return (
+            "\nATTACKER SOPHISTICATION: ADVANCED\n"
+            "This is a highly skilled attacker. Generate extremely detailed, dense output with:\n"
+            "- Deep technical details (kernel versions, internal IPs, service configs)\n"
+            "- Canary-style data that looks like real secrets (API keys, tokens, credentials)\n"
+            "- At least 15-20 data rows/entries to waste their analysis time\n"
+        )
+    elif attacker_type == "intermediate":
+        return (
+            "\nATTACKER SOPHISTICATION: INTERMEDIATE\n"
+            "This is a moderately skilled attacker. Generate realistic output with:\n"
+            "- Standard enterprise data (10-12 records)\n"
+            "- Realistic but not overly detailed technical info\n"
+        )
+    # bot / unknown
+    return (
+        "\nATTACKER SOPHISTICATION: LOW\n"
+        "This is a script/bot. Generate a concise but realistic response with 6-8 data rows.\n"
+    )
+
+
+def build_prompt(
+    payload: str,
+    attack_type: str,
+    endpoint: str = "",
+    strategy: str = "",
+    attacker_type: str = "unknown",
+    attack_pattern: str = "none",
+) -> str:
     """
     Build a strict LLM prompt based on the detected attack type.
 
     Args:
-        payload:     Request body (may be empty for GET requests)
-        attack_type: Detected attack category (from rule engine or AI classifier)
-        endpoint:    Full URL path + query string (carries GET payloads)
+        payload:        Request body (may be empty for GET requests)
+        attack_type:    Detected attack category (from rule engine or AI classifier)
+        endpoint:       Full URL path + query string (carries GET payloads)
+        strategy:       Deception strategy from adaptive engine
+        attacker_type:  Attacker sophistication level (bot/intermediate/advanced)
+        attack_pattern: Detected attack pattern from behavior profiler
 
     Returns:
         A focused prompt string for the LLM.
@@ -111,46 +148,47 @@ def build_prompt(payload: str, attack_type: str, endpoint: str = "") -> str:
         attack_surface = "(empty request)\n"
 
     ctx = _random_context()
+    sophistication = _sophistication_directive(strategy, attacker_type)
 
     # Route to attack-specific template
     upper = attack_type.upper()
 
     if "SQL" in upper:
-        return _sql_injection_prompt(attack_surface, ctx)
+        return _sql_injection_prompt(attack_surface, ctx, sophistication)
     if "COMMAND" in upper:
-        return _command_injection_prompt(attack_surface, ctx)
+        return _command_injection_prompt(attack_surface, ctx, sophistication)
     if any(kw in upper for kw in ("FILE", "TRAVERSAL", "DIRECTORY", "PATH")):
-        return _path_traversal_prompt(attack_surface, ctx)
+        return _path_traversal_prompt(attack_surface, ctx, sophistication)
     if "XSS" in upper or "CROSS" in upper:
-        return _xss_prompt(attack_surface, ctx)
+        return _xss_prompt(attack_surface, ctx, sophistication)
     if "ACCESS" in upper or "BROKEN" in upper or "IDOR" in upper:
-        return _broken_access_prompt(attack_surface, ctx)
+        return _broken_access_prompt(attack_surface, ctx, sophistication)
     if "AUTH" in upper or "BRUTE" in upper or "CREDENTIAL" in upper:
-        return _auth_attack_prompt(attack_surface, ctx)
+        return _auth_attack_prompt(attack_surface, ctx, sophistication)
     if "SSRF" in upper or "SERVER-SIDE" in upper:
-        return _ssrf_prompt(attack_surface, ctx)
+        return _ssrf_prompt(attack_surface, ctx, sophistication)
     if "NOSQL" in upper or "MONGO" in upper:
-        return _nosql_injection_prompt(attack_surface, ctx)
+        return _nosql_injection_prompt(attack_surface, ctx, sophistication)
     if "XML" in upper or "XXE" in upper or "ENTITY" in upper:
-        return _xxe_prompt(attack_surface, ctx)
+        return _xxe_prompt(attack_surface, ctx, sophistication)
     if "JNDI" in upper or "LOG4" in upper or "DESERIALIZATION" in upper:
-        return _jndi_prompt(attack_surface, ctx)
+        return _jndi_prompt(attack_surface, ctx, sophistication)
     if "ENUM" in upper:
-        return _enumeration_prompt(attack_surface, ctx)
+        return _enumeration_prompt(attack_surface, ctx, sophistication)
 
     # Unknown attack type — use intelligent auto-detect prompt
-    return _unknown_attack_prompt(attack_surface, ctx)
+    return _unknown_attack_prompt(attack_surface, ctx, sophistication)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
 # ATTACK-SPECIFIC PROMPT TEMPLATES
 # ═══════════════════════════════════════════════════════════════════════════
 
-def _sql_injection_prompt(attack_surface: str, ctx: dict) -> str:
+def _sql_injection_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are a {ctx['db']} database server running on {ctx['os']} for {ctx['company']} ({ctx['industry']}).\n\n"
         f"The following SQL query was executed against the production database:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS:\n"
         "- Output a raw database result table formatted with pipes (|) and dashes (-) as delimiters.\n"
         "- Include column headers: id, username, email, password_hash, role, last_login, phone, department.\n"
@@ -163,12 +201,12 @@ def _sql_injection_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _command_injection_prompt(attack_surface: str, ctx: dict) -> str:
+def _command_injection_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are a Linux terminal on a {ctx['os']} production server for {ctx['company']} ({ctx['industry']}).\n"
         f"Server stack: {ctx['server']}\n\n"
         f"The following command(s) were executed:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS:\n"
         "- Output the EXACT terminal output that Linux would display for these commands.\n"
         "- If the command is 'cat /etc/passwd': show 15+ users including root, daemon, service accounts "
@@ -184,12 +222,12 @@ def _command_injection_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _path_traversal_prompt(attack_surface: str, ctx: dict) -> str:
+def _path_traversal_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are a {ctx['os']} production file server for {ctx['company']} ({ctx['industry']}).\n"
         f"Server: {ctx['server']} | Database: {ctx['db']}\n\n"
         f"The following file/resource was requested:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS — return content based on what file was requested:\n"
         "- /etc/passwd: 15+ lines with realistic users (root, daemon, company-specific service accounts like "
         "'deploy_svc', 'db_replication', 'monitoring', 'backup_agent'). Use proper format: name:x:uid:gid:gecos:home:shell\n"
@@ -206,12 +244,12 @@ def _path_traversal_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _xss_prompt(attack_surface: str, ctx: dict) -> str:
+def _xss_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are the internal web application for {ctx['company']} ({ctx['industry']}).\n"
         f"Server: {ctx['server']}\n\n"
         f"A search or form submission was received:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS:\n"
         "- Return a complete, realistic HTML page that REFLECTS the user's input directly into the page "
         "(this simulates an XSS vulnerability — the input must appear unescaped in the HTML).\n"
@@ -227,12 +265,12 @@ def _xss_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _broken_access_prompt(attack_surface: str, ctx: dict) -> str:
+def _broken_access_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are the internal admin API for {ctx['company']} ({ctx['industry']}).\n"
         f"Server: {ctx['server']} | DB: {ctx['db']}\n\n"
         f"An unauthorized request was received:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS:\n"
         "- Return a JSON API response that looks like a successful unauthorized access to admin data.\n"
         "- The response should be a JSON object with realistic admin-level data:\n"
@@ -246,12 +284,12 @@ def _broken_access_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _auth_attack_prompt(attack_surface: str, ctx: dict) -> str:
+def _auth_attack_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are the authentication server for {ctx['company']} ({ctx['industry']}).\n"
         f"Server: {ctx['server']}\n\n"
         f"A login/authentication attempt was received:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS:\n"
         "- Return a realistic authentication server response that mimics a PARTIALLY successful login.\n"
         "- Choose ONE of these realistic response formats:\n"
@@ -265,11 +303,11 @@ def _auth_attack_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _ssrf_prompt(attack_surface: str, ctx: dict) -> str:
+def _ssrf_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are an internal cloud server (AWS EC2) for {ctx['company']} ({ctx['industry']}).\n\n"
         f"An internal HTTP request was made:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS:\n"
         "- The attacker is attempting SSRF (Server-Side Request Forgery) to access internal cloud metadata.\n"
         "- Return a realistic AWS EC2 instance metadata response as if the request to 169.254.169.254 succeeded.\n"
@@ -286,11 +324,11 @@ def _ssrf_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _nosql_injection_prompt(attack_surface: str, ctx: dict) -> str:
+def _nosql_injection_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are a MongoDB 7.0 database server for {ctx['company']} ({ctx['industry']}).\n\n"
         f"The following query was executed:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS:\n"
         "- The attacker used NoSQL injection operators ($gt, $ne, $regex, etc.) to bypass authentication or dump data.\n"
         "- Return a realistic MongoDB query result that looks like the injection succeeded.\n"
@@ -307,11 +345,11 @@ def _nosql_injection_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _xxe_prompt(attack_surface: str, ctx: dict) -> str:
+def _xxe_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are an XML processing server ({ctx['server']}) for {ctx['company']} ({ctx['industry']}).\n\n"
         f"The following XML was submitted:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS:\n"
         "- The attacker submitted an XXE (XML External Entity) injection to read server files.\n"
         "- Return a realistic XML response that includes the LEAKED FILE CONTENT within the XML output.\n"
@@ -327,12 +365,12 @@ def _xxe_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _jndi_prompt(attack_surface: str, ctx: dict) -> str:
+def _jndi_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are a Java application server ({ctx['server']}) for {ctx['company']} ({ctx['industry']}).\n"
         f"Running on {ctx['os']}\n\n"
         f"The following request was received:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS:\n"
         "- The attacker is attempting a JNDI/Log4Shell injection or Java deserialization attack.\n"
         "- Return a realistic Java application server error response that reveals internal information.\n"
@@ -353,11 +391,11 @@ def _jndi_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _enumeration_prompt(attack_surface: str, ctx: dict) -> str:
+def _enumeration_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     return (
         f"You are a web server ({ctx['server']}) for {ctx['company']} ({ctx['industry']}).\n\n"
         f"The following resource was requested:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS — return content based on what was requested:\n"
         "- /robots.txt: Return a realistic robots.txt with Disallow entries for /admin, /api/internal, "
         "/backup, /config, /.git, /staging, /debug — revealing hidden paths.\n"
@@ -372,7 +410,7 @@ def _enumeration_prompt(attack_surface: str, ctx: dict) -> str:
     )
 
 
-def _unknown_attack_prompt(attack_surface: str, ctx: dict) -> str:
+def _unknown_attack_prompt(attack_surface: str, ctx: dict, sophistication: str = "") -> str:
     """
     Intelligent fallback for attacks not matched by any specific template.
     Instead of returning generic output, this prompt instructs the LLM to
@@ -382,7 +420,7 @@ def _unknown_attack_prompt(attack_surface: str, ctx: dict) -> str:
         f"You are a production web server ({ctx['server']}) for {ctx['company']} ({ctx['industry']}).\n"
         f"Running {ctx['os']} with {ctx['db']}.\n\n"
         f"The following request was received:\n{attack_surface}\n"
-        f"{_SYSTEM_RULES}\n"
+        f"{_SYSTEM_RULES}{sophistication}\n"
         "SPECIFIC INSTRUCTIONS:\n"
         "You must analyze the request above and determine what kind of attack this is, then respond "
         "as a REAL VULNERABLE SERVER would respond if the attack succeeded.\n\n"
