@@ -133,10 +133,10 @@ services:
     expose:
       - "3002"
     environment:
-      # Use host.docker.internal to route back to local macbook context or use a remote ngrok endpoint
-      LLM_URL: "${LLM_URL:-http://host.docker.internal:11434/api/generate}"
-      MODEL_NAME: "${MODEL_NAME:-qwen2.5:3b}"
-      LLM_TIMEOUT: "${LLM_TIMEOUT:-30}"
+      LLM_URL: "${LLM_URL:-https://api.groq.com}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+      MODEL_NAME: "${MODEL_NAME:-llama-3.1-8b-instant}"
+      LLM_TIMEOUT: "${LLM_TIMEOUT:-15}"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     networks:
       - honeypot-net
@@ -196,8 +196,9 @@ services:
     expose:
       - "5001"
     environment:
-      PHI_MODEL_URL: "http://host.docker.internal:11434"
-      PHI_MODEL_NAME: "${MODEL_NAME:-qwen2.5:3b}"
+      PHI_MODEL_URL: "${LLM_URL:-https://api.groq.com}"
+      PHI_MODEL_NAME: "${MODEL_NAME:-llama-3.1-8b-instant}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     networks:
       - honeypot-net

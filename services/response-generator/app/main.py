@@ -26,24 +26,27 @@ logger = logging.getLogger("response_generator")
 
 async def _warmup_model():
     """
-    Send a tiny request to Ollama on startup to pre-load the model into memory.
-    Prevents the first deception response from timing out due to cold start.
+    Send a tiny request to the LLM API on startup to verify connectivity.
+    Works with Groq, OpenAI, or any OpenAI-compatible endpoint.
     """
-    from app.client import LLM_API_URL, MODEL_NAME
+    from app.client import LLM_BASE_URL, MODEL_NAME, LLM_API_KEY
     import httpx
-    logger.info(f"Warming up LLM model '{MODEL_NAME}' at {LLM_API_URL}...")
+    logger.info(f"Warming up LLM model '{MODEL_NAME}' at {LLM_BASE_URL}...")
     try:
-        # Use the /api/generate endpoint (same as client.py uses)
-        async with httpx.AsyncClient(timeout=120.0) as client:
+        headers = {"Content-Type": "application/json"}
+        if LLM_API_KEY:
+            headers["Authorization"] = f"Bearer {LLM_API_KEY}"
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
-                LLM_API_URL,
+                f"{LLM_BASE_URL}/openai/v1/chat/completions",
                 json={
                     "model": MODEL_NAME,
-                    "prompt": "Say OK",
+                    "messages": [{"role": "user", "content": "Say OK"}],
+                    "max_tokens": 5,
                     "stream": False,
-                    "options": {"num_predict": 5},
-                    "keep_alive": "10m",
                 },
+                headers=headers,
             )
             resp.raise_for_status()
             logger.info(f"Model warm-up complete — '{MODEL_NAME}' is loaded and ready")

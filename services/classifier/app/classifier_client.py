@@ -25,9 +25,10 @@ logger = logging.getLogger("classifier")
 # ---------------------------------------------------------------------------
 # Configuration — all values come from env vars, never hard-coded
 # ---------------------------------------------------------------------------
-PHI_MODEL_URL: str = os.environ.get("PHI_MODEL_URL", "http://host.docker.internal:11434").rstrip("/")
-PHI_MODEL_NAME: str = os.environ.get("PHI_MODEL_NAME", "phi3")
-TIMEOUT: float = float(os.environ.get("CLASSIFIER_TIMEOUT", "60"))
+PHI_MODEL_URL: str = os.environ.get("PHI_MODEL_URL", "https://api.groq.com").rstrip("/")
+PHI_MODEL_NAME: str = os.environ.get("PHI_MODEL_NAME", "llama-3.1-8b-instant")
+LLM_API_KEY: str = os.environ.get("LLM_API_KEY", "")
+TIMEOUT: float = float(os.environ.get("CLASSIFIER_TIMEOUT", "30"))
 
 # Attack categories the model is asked to choose from
 ATTACK_CATEGORIES = [
@@ -176,14 +177,15 @@ async def classify_request(
     }
 
     try:
+        req_headers = {"Content-Type": "application/json"}
+        if LLM_API_KEY:
+            req_headers["Authorization"] = f"Bearer {LLM_API_KEY}"
+
         async with httpx.AsyncClient(timeout=TIMEOUT) as client:
             resp = await client.post(
-                f"{PHI_MODEL_URL}/v1/chat/completions",
+                f"{PHI_MODEL_URL}/openai/v1/chat/completions",
                 json=payload_body,
-                headers={
-                    "Content-Type": "application/json",
-                    "ngrok-skip-browser-warning": "true",  # skip ngrok browser page
-                },
+                headers=req_headers,
             )
             resp.raise_for_status()
             data = resp.json()

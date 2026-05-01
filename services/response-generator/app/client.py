@@ -1,15 +1,17 @@
 """
-Isolated LLM HTTP Client
+Isolated LLM HTTP Client — OpenAI-Compatible Format
 
 Responsibilities:
-  - Call external LLM (Ollama) via async HTTP POST
+  - Call LLM via async HTTP POST using OpenAI chat completions format
+  - Works with: Groq, OpenAI, Ollama (/v1/chat/completions), llama.cpp
   - Configurable timeout via LLM_TIMEOUT env var (default: 30s)
   - Return plain text response
   - Raise LLMClientError on any failure (never crash)
 
 Environment Variables:
-  LLM_API_URL  — LLM endpoint (falls back to LLM_URL for backward compat)
-  MODEL_NAME   — Ollama model name (default: qwen2.5:3b)
+  LLM_URL      — Base URL (e.g., https://api.groq.com or http://localhost:11434)
+  LLM_API_KEY  — API key for auth (required for Groq/OpenAI, optional for local Ollama)
+  MODEL_NAME   — Model name (default: llama-3.1-8b-instant)
   LLM_TIMEOUT  — Request timeout in seconds (default: 30)
 """
 
@@ -23,14 +25,16 @@ logger = logging.getLogger("response_generator")
 # ---------------------------------------------------------------------------
 # Configuration — all from environment, easily changeable
 # ---------------------------------------------------------------------------
-LLM_API_URL: str = os.environ.get(
-    "LLM_API_URL",
-    os.environ.get("LLM_URL", "http://host.docker.internal:11434/api/generate"),
-)
+LLM_BASE_URL: str = os.environ.get(
+    "LLM_URL",
+    "https://api.groq.com",
+).rstrip("/")
 
-MODEL_NAME: str = os.environ.get("MODEL_NAME", "qwen2.5:3b")
+LLM_API_KEY: str = os.environ.get("LLM_API_KEY", "")
 
-LLM_TIMEOUT: float = float(os.environ.get("LLM_TIMEOUT", "60"))
+MODEL_NAME: str = os.environ.get("MODEL_NAME", "llama-3.1-8b-instant")
+
+LLM_TIMEOUT: float = float(os.environ.get("LLM_TIMEOUT", "30"))
 
 
 class LLMClientError(Exception):
@@ -42,29 +46,50 @@ async def call_llm(prompt: str) -> str:
     """
     Send a prompt to the LLM and return the generated text.
 
+    Uses OpenAI-compatible /v1/chat/completions format, which works with
+    Groq, OpenAI, Ollama, llama.cpp, and most LLM providers.
+
     Raises LLMClientError if the call fails, times out, or returns
     an unparseable response.
     """
+    headers = {"Content-Type": "application/json"}
+    if LLM_API_KEY:
+        headers["Authorization"] = f"Bearer {LLM_API_KEY}"
+
+    payload = {
+        "model": MODEL_NAME,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "You are a real production server. Output ONLY raw server "
+                    "responses. Never use markdown, code blocks, or mention AI."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.25,
+        "max_tokens": 2048,
+        "top_p": 0.9,
+        "stream": False,
+    }
+
     try:
         async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as client:
             resp = await client.post(
-                LLM_API_URL,
-                json={
-                    "model": MODEL_NAME,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.25,
-                        "num_predict": 2048,
-                        "top_p": 0.9,
-                        "repeat_penalty": 1.15,
-                    },
-                    "keep_alive": "10m",
-                },
+                f"{LLM_BASE_URL}/openai/v1/chat/completions",
+                json=payload,
+                headers=headers,
             )
             resp.raise_for_status()
             data = resp.json()
-            text = data.get("response", "").strip()
+
+            # Parse OpenAI-compatible response format
+            choices = data.get("choices", [])
+            if not choices:
+                raise LLMClientError("LLM returned no choices")
+
+            text = choices[0].get("message", {}).get("content", "").strip()
             if not text:
                 raise LLMClientError("LLM returned empty response body")
             return text
